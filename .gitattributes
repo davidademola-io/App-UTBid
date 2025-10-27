@@ -1,0 +1,13 @@
+# normalize text files to LF in the repo
+* text=auto eol=lf
+
+# force correct endings for scripts
+gradlew eol=lf
+gradlew.bat eol=crlf
+
+# binaries
+*.png binary
+*.jpg binary
+*.jar binary
+*.keystore binary
+*.jks binary
