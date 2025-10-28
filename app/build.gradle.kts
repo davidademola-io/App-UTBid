@@ -1,7 +1,9 @@
 plugins {
     id("com.android.application")
     kotlin("android")
+    id("org.jetbrains.kotlin.plugin.compose")   // 👈 required with Kotlin 2.0+
 }
+
 
 android {
     namespace = "com.example.apputbid"
@@ -40,7 +42,6 @@ android {
 }
 
 dependencies {
-    // 👇 Compose BOM keeps versions aligned
     val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -52,9 +53,10 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
-    debugImplementation("androidx.compose.ui:test-manifest")
+    debugImplementation("androidx.compose.ui:ui-test-manifest") // ✅ correct
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
 }
+
