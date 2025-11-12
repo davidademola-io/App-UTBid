@@ -119,31 +119,28 @@ data class Bid(
 
 object BiddingDatabase {
     val events = listOf(
-        BiddingEvent(1, "Soccer", "Blue Ballers", "Kinfolk", 1.8, 2.1, "Sports"),
-        BiddingEvent(2, "Hackathon Winner", "Team Alpha", "Team Beta", 1.5, 2.5, "Academic"),
-        BiddingEvent(3, "Debate Competition", "Law Society", "Business Club", 1.9, 1.9, "Academic"),
-        BiddingEvent(4, "Football Finals", "Wildcats", "Panthers", 2.0, 1.7, "Sports"),
-        BiddingEvent(5, "Chess Tournament", "Knights Club", "Rooks Society", 2.2, 1.6, "Games"),
+        BiddingEvent(1, "Men's Soccer", "Blue Ballers", "Kinfolk", 1.8, 2.1, "Sports"),
+        BiddingEvent(1, "Men's Soccer", "Calmation", "DDD FC", 1.5, 2.5, "Sports"),
+        BiddingEvent(2, "Women's Soccer", "Oval Gladiators", "Heavy Flow", 1.9, 1.9, "Sports"),
+        BiddingEvent(2, "Women's Soccer", "Ball Handlers", "The SockHers", 2.0, 1.7, "Sports"),
     )
 
     val teams = listOf(
-        Team("Tigers", 12, 3, "Basketball"),
-        Team("Eagles", 10, 5, "Basketball"),
-        Team("Wildcats", 8, 7, "Football"),
-        Team("Panthers", 11, 4, "Football"),
-        Team("Blue Ballers", 9, 6, "Soccer"),
-        Team("Kinfolk", 7, 8, "Soccer"),
-        Team("Sharks", 13, 2, "Hockey"),
-        Team("Bears", 6, 9, "Hockey")
+        Team("Blue Ballers", 12, 3, "Men's Soccer"),
+        Team("Kinfolk", 10, 5, "Men's Soccer"),
+        Team("Oval Gladiators", 8, 7, "Women's Soccer"),
+        Team("Heavy Flow", 11, 4, "Women's Soccer"),
+        Team("DDD FC", 9, 6, "Men's Soccer"),
+        Team("Calmation", 7, 8, "Men's Soccer"),
+        Team("Ball Handlers", 13, 2, "Women's Soccer"),
+        Team("The SockHers", 6, 9, "Women's Soccer")
     )
 
     val games = listOf(
-        Game(1, "Blue Ballers", "Kinfolk", 4, 1, "Today, 3:00 PM", "completed", "Soccer"),
-        Game(2, "Wildcats", "Panthers", 24, 21, "Today, 6:30 PM", "completed", "Football"),
-        Game(3, "Dragons", "Phoenix", null, null, "Tomorrow, 4:00 PM", "upcoming", "Soccer"),
-        Game(4, "Sharks", "Bears", 3, 2, "Yesterday", "completed", "Hockey"),
-        Game(5, "Eagles", "Tigers", null, null, "Nov 15, 7:00 PM", "upcoming", "Basketball"),
-        Game(6, "Panthers", "Wildcats", null, null, "Nov 16, 5:30 PM", "upcoming", "Football")
+        Game(1, "Blue Ballers", "Kinfolk", 4, 1, "Today, 3:00 PM", "completed", "Men's Soccer"),
+        Game(2, "Oval Gladiators", "Heavy Flow", 2, 3, "Today, 6:30 PM", "completed", "Women's Soccer"),
+        Game(3, "Calmation", "DDD FC", null, null, "Tomorrow, 4:00 PM", "upcoming", "Men's Soccer"),
+        Game(4, "Ball Handlers", "The SockHers", 3, 2, "Yesterday", "completed", "Women's Soccer"),
     )
 
     private val userBids = mutableMapOf<String, MutableList<Bid>>()
@@ -405,15 +402,15 @@ fun HomeScreen(username: String, balance: Double, modifier: Modifier = Modifier)
                 ) {
                     Column {
                         Text(
-                            text = "Uni Bidding",
+                            text = "UTBid",
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimary
+                            color = MaterialTheme.colorScheme.onSecondary
                         )
                         Text(
                             text = "Welcome back!",
                             fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                            color = MaterialTheme.colorScheme.onSecondary
                         )
                     }
 
@@ -426,7 +423,7 @@ fun HomeScreen(username: String, balance: Double, modifier: Modifier = Modifier)
                                 text = username,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onPrimary
+                                color = MaterialTheme.colorScheme.onSecondary
                             )
                         }
                         Icon(
