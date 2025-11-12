@@ -28,6 +28,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.ViewModelProvider
+import com.example.apputbid.ui.AuthViewModel
+import com.example.apputbid.ui.auth.UniBiddingApp
+
+
 
 // Color Scheme
 private val Orange = Color(0xFFFF6B35)
@@ -74,23 +79,6 @@ fun UniBiddingTheme(
     )
 }
 
-// Simple in-memory database
-object UserDatabase {
-    private val users = mutableMapOf<String, String>()
-
-    fun register(username: String, password: String): Boolean {
-        return if (!users.containsKey(username)) {
-            users[username] = password
-            true
-        } else {
-            false
-        }
-    }
-
-    fun login(username: String, password: String): Boolean {
-        return users[username] == password
-    }
-}
 
 // Bidding data classes
 data class BiddingEvent(
@@ -175,41 +163,42 @@ object BiddingDatabase {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val authViewModel = ViewModelProvider(this)[AuthViewModel::class.java]
+
         setContent {
             UniBiddingTheme {
-                UniBiddingApp()
+                UniBiddingApp(authViewModel)
             }
         }
     }
 }
 
-@Composable
-fun UniBiddingApp() {
-    var currentScreen by remember { mutableStateOf("login") }
-    var currentUser by remember { mutableStateOf("") }
 
-    when (currentScreen) {
-        "login" -> LoginScreen(
-            onLoginSuccess = { username ->
-                currentUser = username
-                currentScreen = "home"
-            }
-        )
-        "home" -> MainScreen(
-            username = currentUser,
-            onLogout = {
-                currentScreen = "login"
-                currentUser = ""
-            }
+@Composable
+fun UniBiddingApp(vm: AuthViewModel) {
+    val state by vm.state.collectAsState()
+
+    when (state.currentUser) {
+        null -> LoginScreen(vm = vm)
+        else -> MainScreen(
+            username = state.currentUser!!.username,
+            onLogout = { vm.logout() }
         )
     }
 }
 
+
 @Composable
-fun LoginScreen(onLoginSuccess: (String) -> Unit) {
+fun LoginScreen(
+    vm: AuthViewModel,   // <-- comes from your Activity / UniBiddingApp
+) {
+    val state by vm.state.collectAsState()
+
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var errorMessage by remember { mutableStateOf("") }
+
+    val errorMessage = state.error.orEmpty()
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -277,18 +266,8 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = {
-                    if (username.isNotEmpty() && password.isNotEmpty()) {
-                        if (UserDatabase.login(username, password)) {
-                            onLoginSuccess(username)
-                            errorMessage = ""
-                        } else {
-                            errorMessage = "Invalid username or password"
-                        }
-                    } else {
-                        errorMessage = "Please fill in all fields"
-                    }
-                },
+                onClick = { vm.login(username, password) },   // <-- uses SQLite via ViewModel
+                enabled = !state.loading && username.isNotBlank() && password.isNotBlank(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
@@ -297,24 +276,18 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                     containerColor = MaterialTheme.colorScheme.primary
                 )
             ) {
-                Text("Login", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    if (state.loading) "Signing in..." else "Login",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedButton(
-                onClick = {
-                    if (username.isNotEmpty() && password.isNotEmpty()) {
-                        if (UserDatabase.register(username, password)) {
-                            onLoginSuccess(username)
-                            errorMessage = ""
-                        } else {
-                            errorMessage = "Username already exists"
-                        }
-                    } else {
-                        errorMessage = "Please fill in all fields"
-                    }
-                },
+                onClick = { vm.register(username, password) },  // <-- SQLite registration
+                enabled = !state.loading && username.isNotBlank() && password.isNotBlank(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
@@ -323,11 +296,17 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                     contentColor = MaterialTheme.colorScheme.secondary
                 )
             ) {
-                Text("Register", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    if (state.loading) "Creating..." else "Register",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
 }
+
+
 
 @Composable
 fun MainScreen(username: String, onLogout: () -> Unit) {
@@ -989,13 +968,8 @@ fun BidDialog(
     )
 }
 
-@Preview(showBackground = true)
-@Composable
-fun LoginScreenPreview() {
-    UniBiddingTheme {
-        LoginScreen(onLoginSuccess = {})
-    }
-}
+
+
 
 @Preview(showBackground = true)
 @Composable
