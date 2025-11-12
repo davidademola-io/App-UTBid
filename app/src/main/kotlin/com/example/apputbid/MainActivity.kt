@@ -375,19 +375,33 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
 @Composable
 fun HomeScreen(username: String, balance: Double, modifier: Modifier = Modifier) {
     var searchQuery by remember { mutableStateOf("") }
+    var selectedSport by remember { mutableStateOf("All") }
 
-    // Filter games based on search query
-    val filteredGames = remember(searchQuery) {
-        if (searchQuery.isBlank()) {
-            BiddingDatabase.games
-        } else {
-            BiddingDatabase.games.filter { game ->
+    // Get unique sports from games
+    val sports = remember {
+        listOf("All") + BiddingDatabase.games.map { it.sport }.distinct().sorted()
+    }
+
+    // Filter games based on search query and selected sport
+    val filteredGames = remember(searchQuery, selectedSport) {
+        var games = BiddingDatabase.games
+
+        // Filter by sport
+        if (selectedSport != "All") {
+            games = games.filter { it.sport == selectedSport }
+        }
+
+        // Filter by search query
+        if (searchQuery.isNotBlank()) {
+            games = games.filter { game ->
                 game.homeTeam.contains(searchQuery, ignoreCase = true) ||
                         game.awayTeam.contains(searchQuery, ignoreCase = true) ||
                         game.sport.contains(searchQuery, ignoreCase = true) ||
                         game.status.contains(searchQuery, ignoreCase = true)
             }
         }
+
+        games
     }
 
     Surface(
@@ -523,6 +537,30 @@ fun HomeScreen(username: String, balance: Double, modifier: Modifier = Modifier)
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Sports Filter Tabs
+                ScrollableTabRow(
+                    selectedTabIndex = sports.indexOf(selectedSport),
+                    containerColor = MaterialTheme.colorScheme.background,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    edgePadding = 0.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    sports.forEach { sport ->
+                        Tab(
+                            selected = selectedSport == sport,
+                            onClick = { selectedSport = sport },
+                            text = {
+                                Text(
+                                    text = sport,
+                                    fontWeight = if (selectedSport == sport) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 // Recent & Upcoming Games
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -530,13 +568,13 @@ fun HomeScreen(username: String, balance: Double, modifier: Modifier = Modifier)
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (searchQuery.isBlank()) "Recent & Upcoming Games" else "Search Results",
+                        text = if (searchQuery.isBlank() && selectedSport == "All") "Recent & Upcoming Games" else "Search Results",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
-                    if (searchQuery.isNotBlank()) {
+                    if (searchQuery.isNotBlank() || selectedSport != "All") {
                         Text(
                             text = "${filteredGames.size} found",
                             fontSize = 14.sp,
@@ -545,7 +583,7 @@ fun HomeScreen(username: String, balance: Double, modifier: Modifier = Modifier)
                     }
                 }
 
-                if (filteredGames.isEmpty() && searchQuery.isNotBlank()) {
+                if (filteredGames.isEmpty()) {
                     // No results message
                     Column(
                         modifier = Modifier
@@ -875,7 +913,8 @@ fun TeamBidButton(team: String, odds: Double, onClick: () -> Unit, modifier: Mod
                 text = team,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer, textAlign = TextAlign.Center
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
