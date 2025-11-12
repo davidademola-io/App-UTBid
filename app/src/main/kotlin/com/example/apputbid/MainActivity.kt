@@ -1,4 +1,3 @@
-
 package com.example.apputbid
 
 import android.os.Bundle
@@ -104,13 +103,59 @@ data class BiddingEvent(
     val category: String
 )
 
+data class Game(
+    val id: Int,
+    val homeTeam: String,
+    val awayTeam: String,
+    val homeScore: Int?,
+    val awayScore: Int?,
+    val date: String,
+    val status: String,
+    val sport: String
+)
+
+data class Team(
+    val name: String,
+    val wins: Int,
+    val losses: Int,
+    val sport: String
+)
+
+data class Bid(
+    val eventId: Int,
+    val eventTitle: String,
+    val team: String,
+    val amount: Double,
+    val odds: Double
+)
+
 object BiddingDatabase {
     val events = listOf(
-        BiddingEvent(1, "Basketball Championship", "Tigers", "Eagles", 1.8, 2.1, "Sports"),
+        BiddingEvent(1, "Soccer", "Blue Ballers", "Kinfolk", 1.8, 2.1, "Sports"),
         BiddingEvent(2, "Hackathon Winner", "Team Alpha", "Team Beta", 1.5, 2.5, "Academic"),
         BiddingEvent(3, "Debate Competition", "Law Society", "Business Club", 1.9, 1.9, "Academic"),
         BiddingEvent(4, "Football Finals", "Wildcats", "Panthers", 2.0, 1.7, "Sports"),
         BiddingEvent(5, "Chess Tournament", "Knights Club", "Rooks Society", 2.2, 1.6, "Games"),
+    )
+
+    val teams = listOf(
+        Team("Tigers", 12, 3, "Basketball"),
+        Team("Eagles", 10, 5, "Basketball"),
+        Team("Wildcats", 8, 7, "Football"),
+        Team("Panthers", 11, 4, "Football"),
+        Team("Blue Ballers", 9, 6, "Soccer"),
+        Team("Kinfolk", 7, 8, "Soccer"),
+        Team("Sharks", 13, 2, "Hockey"),
+        Team("Bears", 6, 9, "Hockey")
+    )
+
+    val games = listOf(
+        Game(1, "Blue Ballers", "Kinfolk", 4, 1, "Today, 3:00 PM", "completed", "Soccer"),
+        Game(2, "Wildcats", "Panthers", 24, 21, "Today, 6:30 PM", "completed", "Football"),
+        Game(3, "Dragons", "Phoenix", null, null, "Tomorrow, 4:00 PM", "upcoming", "Soccer"),
+        Game(4, "Sharks", "Bears", 3, 2, "Yesterday", "completed", "Hockey"),
+        Game(5, "Eagles", "Tigers", null, null, "Nov 15, 7:00 PM", "upcoming", "Basketball"),
+        Game(6, "Panthers", "Wildcats", null, null, "Nov 16, 5:30 PM", "upcoming", "Football")
     )
 
     private val userBids = mutableMapOf<String, MutableList<Bid>>()
@@ -126,14 +171,6 @@ object BiddingDatabase {
         return userBids[username] ?: emptyList()
     }
 }
-
-data class Bid(
-    val eventId: Int,
-    val eventTitle: String,
-    val team: String,
-    val amount: Double,
-    val odds: Double
-)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -339,6 +376,20 @@ fun MainScreen(username: String, onLogout: () -> Unit) {
 fun HomeScreen(username: String, balance: Double, modifier: Modifier = Modifier) {
     var searchQuery by remember { mutableStateOf("") }
 
+    // Filter games based on search query
+    val filteredGames = remember(searchQuery) {
+        if (searchQuery.isBlank()) {
+            BiddingDatabase.games
+        } else {
+            BiddingDatabase.games.filter { game ->
+                game.homeTeam.contains(searchQuery, ignoreCase = true) ||
+                        game.awayTeam.contains(searchQuery, ignoreCase = true) ||
+                        game.sport.contains(searchQuery, ignoreCase = true) ||
+                        game.status.contains(searchQuery, ignoreCase = true)
+            }
+        }
+    }
+
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -349,7 +400,7 @@ fun HomeScreen(username: String, balance: Double, modifier: Modifier = Modifier)
             // Top Bar with User Profile
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.secondary,
                 tonalElevation = 4.dp
             ) {
                 Row(
@@ -402,7 +453,7 @@ fun HomeScreen(username: String, balance: Double, modifier: Modifier = Modifier)
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                placeholder = { Text("Search events...") },
+                placeholder = { Text("Search teams, sports, or status...") },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Search,
@@ -469,6 +520,62 @@ fun HomeScreen(username: String, balance: Double, modifier: Modifier = Modifier)
                     StatCard("Active Bids", "0", Modifier.weight(1f))
                     StatCard("Total Won", "$0.00", Modifier.weight(1f))
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Recent & Upcoming Games
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (searchQuery.isBlank()) "Recent & Upcoming Games" else "Search Results",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                    if (searchQuery.isNotBlank()) {
+                        Text(
+                            text = "${filteredGames.size} found",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                if (filteredGames.isEmpty() && searchQuery.isNotBlank()) {
+                    // No results message
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "No games found",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Try searching for a different team or sport",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(filteredGames) { game ->
+                            GameCard(game)
+                        }
+                    }
+                }
             }
         }
     }
@@ -499,6 +606,114 @@ fun StatCard(title: String, value: String, modifier: Modifier = Modifier) {
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+@Composable
+fun GameCard(game: Game) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = game.sport,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Surface(
+                    color = when (game.status) {
+                        "completed" -> MaterialTheme.colorScheme.surfaceVariant
+                        "live" -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.secondaryContainer
+                    },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = when (game.status) {
+                            "completed" -> "Final"
+                            "live" -> "Live"
+                            else -> "Upcoming"
+                        },
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = when (game.status) {
+                            "completed" -> MaterialTheme.colorScheme.onSurfaceVariant
+                            "live" -> Color.White
+                            else -> MaterialTheme.colorScheme.onSecondaryContainer
+                        }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = game.homeTeam,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = game.awayTeam,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                if (game.status == "completed") {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = game.homeScore.toString(),
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (game.homeScore!! > game.awayScore!!)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = game.awayScore.toString(),
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (game.awayScore!! > game.homeScore!!)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                } else {
+                    Text(
+                        text = game.date,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 }
@@ -660,8 +875,7 @@ fun TeamBidButton(team: String, odds: Double, onClick: () -> Unit, modifier: Mod
                 text = team,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                textAlign = TextAlign.Center
+                color = MaterialTheme.colorScheme.onPrimaryContainer, textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
