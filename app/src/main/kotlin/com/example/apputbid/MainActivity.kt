@@ -550,6 +550,7 @@ fun HomeScreen(username: String, balance: Double, modifier: Modifier = Modifier)
                         color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
+
                     if (searchQuery.isNotBlank() || selectedSport != "All") {
                         Text(
                             text = "${filteredGames.size} found",
