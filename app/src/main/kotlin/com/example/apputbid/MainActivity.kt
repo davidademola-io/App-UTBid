@@ -1,3 +1,4 @@
+
 package com.example.apputbid
 
 import android.os.Bundle
@@ -102,23 +103,6 @@ data class BiddingEvent(
     val odds2: Double,
     val category: String
 )
-data class Game(
-    val id: Int,
-    val homeTeam: String,
-    val awayTeam: String,
-    val homeScore: Int?,
-    val awayScore: Int?,
-    val date: String,
-    val status: String, // "completed", "live", "upcoming"
-    val sport: String
-)
-
-data class Team(
-    val name: String,
-    val wins: Int,
-    val losses: Int,
-    val sport: String
-)
 
 object BiddingDatabase {
     val events = listOf(
@@ -127,26 +111,6 @@ object BiddingDatabase {
         BiddingEvent(3, "Debate Competition", "Law Society", "Business Club", 1.9, 1.9, "Academic"),
         BiddingEvent(4, "Football Finals", "Wildcats", "Panthers", 2.0, 1.7, "Sports"),
         BiddingEvent(5, "Chess Tournament", "Knights Club", "Rooks Society", 2.2, 1.6, "Games"),
-
-        val teams = listOf(
-            Team("Tigers", 12, 3, "Basketball"),
-            Team("Eagles", 10, 5, "Basketball"),
-            Team("Wildcats", 8, 7, "Football"),
-            Team("Panthers", 11, 4, "Football"),
-            Team("Dragons", 9, 6, "Soccer"),
-            Team("Phoenix", 7, 8, "Soccer"),
-            Team("Sharks", 13, 2, "Hockey"),
-            Team("Bears", 6, 9, "Hockey")
-        )
-
-    val games = listOf(
-        Game(1, "Tigers", "Eagles", 78, 72, "Today, 3:00 PM", "completed", "Basketball"),
-        Game(2, "Wildcats", "Panthers", 24, 21, "Today, 6:30 PM", "completed", "Football"),
-        Game(3, "Dragons", "Phoenix", null, null, "Tomorrow, 4:00 PM", "upcoming", "Soccer"),
-        Game(4, "Sharks", "Bears", 3, 2, "Yesterday", "completed", "Hockey"),
-        Game(5, "Eagles", "Tigers", null, null, "Nov 15, 7:00 PM", "upcoming", "Basketball"),
-        Game(6, "Panthers", "Wildcats", null, null, "Nov 16, 5:30 PM", "upcoming", "Football")
-    )
     )
 
     private val userBids = mutableMapOf<String, MutableList<Bid>>()
@@ -181,7 +145,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
 
 @Composable
 fun UniBiddingApp() {
@@ -226,14 +189,14 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                 text = "UTBid",
                 fontSize = 48.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
             Text(
                 text = "Place Your Bets",
                 fontSize = 18.sp,
-                color = MaterialTheme.colorScheme.secondary,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(bottom = 48.dp)
             )
 
@@ -320,7 +283,7 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
                     .height(56.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.primary
+                    contentColor = MaterialTheme.colorScheme.secondary
                 )
             ) {
                 Text("Register", fontSize = 18.sp, fontWeight = FontWeight.Bold)
@@ -398,7 +361,7 @@ fun HomeScreen(username: String, balance: Double, modifier: Modifier = Modifier)
                 ) {
                     Column {
                         Text(
-                            text = "UTBid",
+                            text = "Uni Bidding",
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimary
