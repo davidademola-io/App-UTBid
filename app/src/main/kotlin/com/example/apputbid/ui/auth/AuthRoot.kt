@@ -9,8 +9,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.apputbid.MainScreen
 import com.example.apputbid.ui.AuthViewModel
+import com.example.apputbid.ui.main.MainScreen
 
 @Composable
 fun UniBiddingApp(vm: AuthViewModel) {
