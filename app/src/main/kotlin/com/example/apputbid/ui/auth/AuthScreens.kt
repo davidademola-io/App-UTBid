@@ -9,29 +9,39 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.tooling.preview.Preview
+import com.example.apputbid.data.UserDatabase
 import com.example.apputbid.ui.main.MainScreen
-import com.example.apputbid.ui.AuthViewModel
+import com.example.apputbid.ui.theme.UniBiddingTheme
 
 @Composable
-fun UniBiddingApp(vm: AuthViewModel) {
-    val state by vm.state.collectAsState()
+fun UniBiddingApp() {
+    var currentScreen by remember { mutableStateOf("login") }
+    var currentUser by remember { mutableStateOf("") }
 
-    when (state.currentUser) {
-        null -> LoginScreen(vm = vm)
-        else -> MainScreen(
-            username = state.currentUser!!.username,
-            onLogout = { vm.logout() }
+    when (currentScreen) {
+        "login" -> LoginScreen(
+            onLoginSuccess = { username ->
+                currentUser = username
+                currentScreen = "home"
+            }
+        )
+        "home" -> MainScreen(
+            username = currentUser,
+            onLogout = {
+                currentScreen = "login"
+                currentUser = ""
+            }
         )
     }
 }
 
 @Composable
-fun LoginScreen(vm: AuthViewModel) {
-    val state by vm.state.collectAsState()
+fun LoginScreen(onLoginSuccess: (String) -> Unit) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-
-    val errorMessage = state.error.orEmpty()
+    var errorMessage by remember { mutableStateOf("") }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -99,42 +109,62 @@ fun LoginScreen(vm: AuthViewModel) {
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = { vm.login(username, password) },
-                enabled = !state.loading && username.isNotBlank() && password.isNotBlank(),
+                onClick = {
+                    if (username.isNotEmpty() && password.isNotEmpty()) {
+                        if (UserDatabase.login(username, password)) {
+                            onLoginSuccess(username)
+                            errorMessage = ""
+                        } else {
+                            errorMessage = "Invalid username or password"
+                        }
+                    } else {
+                        errorMessage = "Please fill in all fields"
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary
                 )
             ) {
-                Text(
-                    if (state.loading) "Signing in..." else "Login",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("Login", fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedButton(
-                onClick = { vm.register(username, password) },
-                enabled = !state.loading && username.isNotBlank() && password.isNotBlank(),
+                onClick = {
+                    if (username.isNotEmpty() && password.isNotEmpty()) {
+                        if (UserDatabase.register(username, password)) {
+                            onLoginSuccess(username)
+                            errorMessage = ""
+                        } else {
+                            errorMessage = "Username already exists"
+                        }
+                    } else {
+                        errorMessage = "Please fill in all fields"
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = MaterialTheme.colorScheme.secondary
                 )
             ) {
-                Text(
-                    if (state.loading) "Creating..." else "Register",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("Register", fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun LoginScreenPreview() {
+    UniBiddingTheme {
+        LoginScreen(onLoginSuccess = {})
     }
 }
