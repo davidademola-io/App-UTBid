@@ -355,7 +355,9 @@ fun HomeScreen(username: String, balance: Double, modifier: Modifier = Modifier)
 
     // Get unique sports from games
     val sports = remember {
-        listOf("All") + BiddingDatabase.games.map { it.sport }.distinct().sorted()
+        val sportsFromGames = BiddingDatabase.games.map { it.sport }.distinct()
+        val allSports = (sportsFromGames + listOf("Basketball", "Volleyball", "Beach Volleyball")).distinct().sorted()
+        listOf("All") + allSports
     }
 
     // Filter games based on search query and selected sport
@@ -380,18 +382,17 @@ fun HomeScreen(username: String, balance: Double, modifier: Modifier = Modifier)
         games
     }
 
-    Surface(
+    LazyColumn(
         modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+        contentPadding = PaddingValues(bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Top Bar with User Profile
+
+        item {
+            // Top Bar
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.secondary,
-                tonalElevation = 4.dp
+                color = MaterialTheme.colorScheme.secondary
             ) {
                 Row(
                     modifier = Modifier
@@ -401,196 +402,94 @@ fun HomeScreen(username: String, balance: Double, modifier: Modifier = Modifier)
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text(
-                            text = "UTBid",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSecondary
-                        )
-                        Text(
-                            text = "Welcome back!",
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSecondary
-                        )
+                        Text("UTBid", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        Text("Welcome back!")
                     }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text = username,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSecondary
-                            )
-                        }
-                        Icon(
-                            imageVector = Icons.Default.AccountCircle,
-                            contentDescription = "User Profile",
-                            modifier = Modifier.size(40.dp),
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.AccountCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp)
+                    )
                 }
             }
+        }
 
+        item {
             // Search Bar
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(horizontal = 16.dp),
                 placeholder = { Text("Search teams, sports, or status...") },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Search"
-                    )
-                },
-                shape = RoundedCornerShape(24.dp),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                )
+                leadingIcon = { Icon(Icons.Default.Search, null) },
             )
+        }
 
-            // Main Content Area
-            Column(
+        item {
+            // Balance Card
+            Card(
                 modifier = Modifier
-                    .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 16.dp),
             ) {
-                // Balance Card
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "Current Balance",
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                        Text(
-                            text = "$${"%.2f".format(balance)}",
-                            fontSize = 36.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    }
-                }
-
-                Text(
-                    text = "Quick Stats",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    StatCard("Active Bids", "0", Modifier.weight(1f))
-                    StatCard("Total Won", "$0.00", Modifier.weight(1f))
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Sports Filter Tabs
-                ScrollableTabRow(
-                    selectedTabIndex = sports.indexOf(selectedSport),
-                    containerColor = MaterialTheme.colorScheme.background,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    edgePadding = 0.dp,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    sports.forEach { sport ->
-                        Tab(
-                            selected = selectedSport == sport,
-                            onClick = { selectedSport = sport },
-                            text = {
-                                Text(
-                                    text = sport,
-                                    fontWeight = if (selectedSport == sport) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Recent & Upcoming Games
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (searchQuery.isBlank() && selectedSport == "All") "Recent & Upcoming Games" else "Search Results",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-                    if (searchQuery.isNotBlank() || selectedSport != "All") {
-                        Text(
-                            text = "${filteredGames.size} found",
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                if (filteredGames.isEmpty()) {
-                    // No results message
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "No games found",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Try searching for a different team or sport",
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                } else {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(filteredGames) { game ->
-                            GameCard(game)
-                        }
-                    }
+                    Text("Current Balance", fontSize = 16.sp)
+                    Text("$${"%.2f".format(balance)}", fontSize = 36.sp, fontWeight = FontWeight.Bold)
                 }
             }
+        }
+
+        item {
+            // Quick Stats
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                StatCard("Active Bids", "0", Modifier.weight(1f))
+                StatCard("Total Won", "$0.00", Modifier.weight(1f))
+            }
+        }
+
+        item {
+            // Sports Tabs
+            ScrollableTabRow(
+                selectedTabIndex = sports.indexOf(selectedSport),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                sports.forEach { sport ->
+                    Tab(
+                        selected = selectedSport == sport,
+                        onClick = { selectedSport = sport },
+                        text = { Text(sport) }
+                    )
+                }
+            }
+        }
+
+        item {
+            Text(
+                text = if (searchQuery.isBlank() && selectedSport == "All") "Recent & Upcoming Games" else "Search Results",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
+
+        // Game Cards
+        items(filteredGames) { game ->
+            GameCard(
+                game = game,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            )
         }
     }
 }
@@ -625,9 +524,9 @@ fun StatCard(title: String, value: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun GameCard(game: Game) {
+fun GameCard(game: Game, modifier: Modifier = Modifier) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -738,6 +637,10 @@ fun BiddingScreen(username: String, balance: Double, onBalanceChange: (Double) -
     var showBidDialog by remember { mutableStateOf(false) }
     var selectedTeam by remember { mutableStateOf("") }
 
+    var groupedEvents = remember {
+        BiddingDatabase.events.groupBy { it. title }
+    }
+
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -774,17 +677,20 @@ fun BiddingScreen(username: String, balance: Double, onBalanceChange: (Double) -
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(BiddingDatabase.events) { event ->
-                    EventCard(
-                        event = event,
-                        onBidClick = { team ->
-                            selectedEvent = event
-                            selectedTeam = team
-                            showBidDialog = true
-                        }
-                    )
+                groupedEvents.forEach { (sportTitle, events) ->
+                    item {
+                        SportGroupCard(
+                            sportTitle = sportTitle,
+                            events = events,
+                            onBidClick = { event, team ->
+                                selectedEvent = event
+                                selectedTeam = team
+                                showBidDialog = true
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -812,65 +718,97 @@ fun BiddingScreen(username: String, balance: Double, onBalanceChange: (Double) -
 }
 
 @Composable
-fun EventCard(event: BiddingEvent, onBidClick: (String) -> Unit) {
+fun SportGroupCard(
+    sportTitle: String,
+    events: List<BiddingEvent>,
+    onBidClick: (BiddingEvent, String) -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
+            // Sport Title Header
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = event.title,
-                    fontSize = 18.sp,
+                    text = sportTitle,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.primary
                 )
                 Surface(
                     color = MaterialTheme.colorScheme.secondaryContainer,
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = event.category,
+                        text = "${events.size} matches",
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                TeamBidButton(
-                    team = event.team1,
-                    odds = event.odds1,
-                    onClick = { onBidClick(event.team1) },
-                    modifier = Modifier.weight(1f)
+            // List of matches for this sport
+            events.forEachIndexed { index, event ->
+                MatchRow(
+                    event = event,
+                    onBidClick = onBidClick
                 )
 
-                TeamBidButton(
-                    team = event.team2,
-                    odds = event.odds2,
-                    onClick = { onBidClick(event.team2) },
-                    modifier = Modifier.weight(1f)
-                )
+                // Add divider between matches except for the last one
+                if (index < events.size - 1) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
             }
         }
     }
 }
+
+@Composable
+fun MatchRow(
+    event: BiddingEvent,
+    onBidClick: (BiddingEvent, String) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        TeamBidButton(
+            team = event.team1,
+            odds = event.odds1,
+            onClick = { onBidClick(event, event.team1) },
+            modifier = Modifier.weight(1f)
+        )
+
+        TeamBidButton(
+            team = event.team2,
+            odds = event.odds2,
+            onClick = { onBidClick(event, event.team2) },
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
 
 @Composable
 fun TeamBidButton(team: String, odds: Double, onClick: () -> Unit, modifier: Modifier = Modifier) {
