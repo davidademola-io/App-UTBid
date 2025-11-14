@@ -1,5 +1,7 @@
 package com.example.apputbid.ui.main
 
+// One place for all the bidding-related models
+
 data class BiddingEvent(
     val id: Int,
     val title: String,
@@ -37,6 +39,7 @@ data class Bid(
 )
 
 object BiddingDatabase {
+
     val events = listOf(
         BiddingEvent(1, "Men's Soccer", "Blue Ballers", "Kinfolk", 1.8, 2.1, "Sports"),
         BiddingEvent(2, "Men's Soccer", "Calmation", "DDD FC", 1.5, 2.5, "Sports"),
@@ -47,10 +50,10 @@ object BiddingDatabase {
     val teams = listOf(
         Team("Blue Ballers", 12, 3, "Men's Soccer"),
         Team("Kinfolk", 10, 5, "Men's Soccer"),
+        Team("Calmation", 7, 8, "Men's Soccer"),
+        Team("DDD FC", 9, 6, "Men's Soccer"),
         Team("Oval Gladiators", 8, 7, "Women's Soccer"),
         Team("Heavy Flow", 11, 4, "Women's Soccer"),
-        Team("DDD FC", 9, 6, "Men's Soccer"),
-        Team("Calmation", 7, 8, "Men's Soccer"),
         Team("Ball Handlers", 13, 2, "Women's Soccer"),
         Team("The SockHers", 6, 9, "Women's Soccer")
     )
@@ -62,16 +65,27 @@ object BiddingDatabase {
         Game(4, "Ball Handlers", "The SockHers", 3, 2, "Yesterday", "completed", "Women's Soccer"),
     )
 
+    // ------------------------------
+    //  Bids + Balances per user
+    // ------------------------------
+
     private val userBids = mutableMapOf<String, MutableList<Bid>>()
 
+    private const val DEFAULT_BALANCE = 1000.0
+    private val userBalances = mutableMapOf<String, Double>()
+
     fun placeBid(username: String, bid: Bid) {
-        if (!userBids.containsKey(username)) {
-            userBids[username] = mutableListOf()
-        }
-        userBids[username]?.add(bid)
+        val list = userBids.getOrPut(username) { mutableListOf() }
+        list.add(bid)
     }
 
-    fun getUserBids(username: String): List<Bid> {
-        return userBids[username] ?: emptyList()
+    fun getUserBalance(username: String): Double {
+        // If user has no stored balance yet, we treat it as default
+        return userBalances[username] ?: DEFAULT_BALANCE
     }
+
+    fun setUserBalance(username: String, newBalance: Double) {
+        userBalances[username] = newBalance
+    }
+
 }

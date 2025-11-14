@@ -1,5 +1,6 @@
 package com.example.apputbid.ui.main
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,19 +16,48 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.apputbid.data.BalanceStore
+import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.collectAsState
+import com.example.apputbid.data.BidsStore
+//import androidx.compose.material.icons.filled.History
+//import androidx.compose.material.icons.outlined.History
+import com.example.apputbid.ui.main.Bid
+
+
+
+
 
 @Composable
 fun MainScreen(
     username: String,
     onLogout: () -> Unit
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // Read the persisted balance from DataStore
+    val balanceState = BalanceStore
+        .balanceFlow(context)
+        .collectAsState(initial = BalanceStore.DEFAULT_BALANCE)
+
     var selectedTab by remember { mutableStateOf(0) }
-    var balance by remember { mutableStateOf(1000.0) }
+
+    // Current balance is always whatever DataStore has stored
+    val balance = balanceState.value
+
+    // When the UI wants to change the balance, update DataStore
+    val updateBalance: (Double) -> Unit = { newBalance ->
+        scope.launch {
+            BalanceStore.setBalance(context, newBalance)
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -67,6 +97,23 @@ fun MainScreen(
                         indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                     )
                 )
+                // 🔽 New History tab
+                NavigationBarItem(
+                    icon = {
+//                        Icon(
+//                            if (selectedTab == 2) Icons.Filled.History else Icons.Outlined.History,
+//                            contentDescription = "History"
+//                        )
+                    },
+                    label = { Text("History") },
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                    )
+                )
             }
         }
     ) { paddingValues ->
@@ -76,15 +123,28 @@ fun MainScreen(
                 balance = balance,
                 modifier = Modifier.padding(paddingValues)
             )
+
             1 -> BiddingScreen(
                 username = username,
                 balance = balance,
-                onBalanceChange = { balance = it },
+                onBalanceChange = updateBalance,
+                modifier = Modifier.padding(paddingValues)
+            )
+
+            // 🔽 Hook up the History screen
+            2 -> HistoryScreen(
+                username = username,
                 modifier = Modifier.padding(paddingValues)
             )
         }
     }
+
 }
+
+
+/* =========================
+   HOME SCREEN + STATS
+   ========================= */
 
 @Composable
 fun HomeScreen(
@@ -92,8 +152,17 @@ fun HomeScreen(
     balance: Double,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current   // 👈 add this
+
     var searchQuery by remember { mutableStateOf("") }
     var selectedSport by remember { mutableStateOf("All") }
+    var showActiveBidsDialog by remember { mutableStateOf(false) }
+
+    val userBids by BidsStore
+        .bidsFlow(context, username)
+        .collectAsState(initial = emptyList())
+
+    val activeBidsCount = userBids.size
 
     val sports = remember {
         listOf("All") + BiddingDatabase.games.map { it.sport }.distinct().sorted()
@@ -125,7 +194,8 @@ fun HomeScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Top bar
+
+            // Top Bar
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.secondary,
@@ -165,7 +235,7 @@ fun HomeScreen(
                             )
                         }
                         Icon(
-                            imageVector = Icons.Default.AccountCircle,
+                            imageVector = Icons.Filled.AccountCircle,
                             contentDescription = "User Profile",
                             modifier = Modifier.size(40.dp),
                             tint = MaterialTheme.colorScheme.onSecondary
@@ -184,7 +254,7 @@ fun HomeScreen(
                 placeholder = { Text("Search teams, sports, or status...") },
                 leadingIcon = {
                     Icon(
-                        imageVector = Icons.Default.Search,
+                        imageVector = Icons.Filled.Search,
                         contentDescription = "Search"
                     )
                 },
@@ -196,7 +266,7 @@ fun HomeScreen(
                 )
             )
 
-            // Main content
+            // Main area
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -245,13 +315,29 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    StatCard("Active Bids", "0", Modifier.weight(1f))
-                    StatCard("Total Won", "$0.00", Modifier.weight(1f))
+                    // Active Bids stat card (clickable)
+                    StatCard(
+                        title = "Active Bids",
+                        value = activeBidsCount.toString(),
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            if (activeBidsCount > 0) {
+                                showActiveBidsDialog = true
+                            }
+                        }
+                    )
+
+                    // Total Won – placeholder for now
+                    StatCard(
+                        title = "Total Won",
+                        value = "$0.00",
+                        modifier = Modifier.weight(1f)
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Sport tabs
+                // Sports Filter Tabs
                 ScrollableTabRow(
                     selectedTabIndex = sports.indexOf(selectedSport),
                     containerColor = MaterialTheme.colorScheme.background,
@@ -275,16 +361,18 @@ fun HomeScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Games list header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (searchQuery.isBlank() && selectedSport == "All")
+                        text = if (searchQuery.isBlank() && selectedSport == "All") {
                             "Recent & Upcoming Games"
-                        else
-                            "Search Results",
+                        } else {
+                            "Search Results"
+                        },
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground,
@@ -331,6 +419,129 @@ fun HomeScreen(
                 }
             }
         }
+
+        if (showActiveBidsDialog) {
+            ActiveBidsDialog(
+                bids = userBids,                      // ✅ now from DataStore
+                onDismiss = { showActiveBidsDialog = false }
+            )
+        }
+    }
+}
+
+@Composable
+fun HistoryBidCard(
+    bid: Bid,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = bid.eventTitle,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Team: ${bid.team}",
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Amount: $${"%.2f".format(bid.amount)}",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = "Odds: ${bid.odds}x",
+                fontSize = 14.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Potential win: $${"%.2f".format(bid.amount * bid.odds)}",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+
+@Composable
+fun GameCard(
+    game: Game,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            // Top row: sport + date
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = game.sport,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = game.date,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Teams + optional score
+            val homeScoreText = game.homeScore?.toString() ?: "-"
+            val awayScoreText = game.awayScore?.toString() ?: "-"
+
+            Text(
+                text = "${game.homeTeam} $homeScoreText  vs  $awayScoreText ${game.awayTeam}",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Status (completed / upcoming etc.)
+            Text(
+                text = game.status.replaceFirstChar { it.uppercase() },
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = when (game.status.lowercase()) {
+                    "completed" -> MaterialTheme.colorScheme.secondary
+                    "upcoming"  -> MaterialTheme.colorScheme.primary
+                    else        -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+        }
     }
 }
 
@@ -338,10 +549,17 @@ fun HomeScreen(
 fun StatCard(
     title: String,
     value: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
 ) {
+    val cardModifier = if (onClick != null) {
+        modifier.clickable(onClick = onClick)
+    } else {
+        modifier
+    }
+
     Card(
-        modifier = modifier,
+        modifier = cardModifier,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
@@ -368,112 +586,60 @@ fun StatCard(
 }
 
 @Composable
-fun GameCard(game: Game) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = game.sport,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Surface(
-                    color = when (game.status) {
-                        "completed" -> MaterialTheme.colorScheme.surfaceVariant
-                        "live" -> MaterialTheme.colorScheme.error
-                        else -> MaterialTheme.colorScheme.secondaryContainer
-                    },
-                    shape = RoundedCornerShape(8.dp)
+fun ActiveBidsDialog(
+    bids: List<Bid>,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Active Bids",
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            if (bids.isEmpty()) {
+                Text("You have no active bids.")
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 320.dp)
                 ) {
-                    Text(
-                        text = when (game.status) {
-                            "completed" -> "Final"
-                            "live" -> "Live"
-                            else -> "Upcoming"
-                        },
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = when (game.status) {
-                            "completed" -> MaterialTheme.colorScheme.onSurfaceVariant
-                            "live" -> Color.White
-                            else -> MaterialTheme.colorScheme.onSecondaryContainer
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(bids) { bid ->
+                            Column(
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = bid.eventTitle,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text("${bid.team}  •  $${"%.2f".format(bid.amount)} @ ${bid.odds}x")
+                                Text(
+                                    text = "Potential win: $${"%.2f".format(bid.amount * bid.odds)}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
                         }
-                    )
+                    }
                 }
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = game.homeTeam,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = game.awayTeam,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
-                if (game.status == "completed") {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = game.homeScore.toString(),
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (game.homeScore!! > game.awayScore!!)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = game.awayScore.toString(),
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (game.awayScore!! > game.homeScore!!)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                } else {
-                    Text(
-                        text = game.date,
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
             }
         }
-    }
+    )
 }
+
+/* =========================
+   BIDDING SCREEN
+   ========================= */
 
 @Composable
 fun BiddingScreen(
@@ -482,6 +648,9 @@ fun BiddingScreen(
     onBalanceChange: (Double) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     var selectedEvent by remember { mutableStateOf<BiddingEvent?>(null) }
     var showBidDialog by remember { mutableStateOf(false) }
     var selectedTeam by remember { mutableStateOf("") }
@@ -518,6 +687,7 @@ fun BiddingScreen(
                 }
             }
 
+            // Events list
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
@@ -550,16 +720,22 @@ fun BiddingScreen(
                     else
                         selectedEvent!!.odds2
 
-                    BiddingDatabase.placeBid(
-                        username,
-                        Bid(
-                            eventId = selectedEvent!!.id,
-                            eventTitle = selectedEvent!!.title,
-                            team = selectedTeam,
-                            amount = amount,
-                            odds = odds
+                    // 🔽 Save bid to persistent storage
+                    scope.launch {
+                        BidsStore.addBid(
+                            context = context,
+                            username = username,
+                            bid = Bid(
+                                eventId = selectedEvent!!.id,
+                                eventTitle = selectedEvent!!.title,
+                                team = selectedTeam,
+                                amount = amount,
+                                odds = odds
+                            )
                         )
-                    )
+                    }
+
+                    // 🔽 Update balance (also persisted via BalanceStore already)
                     onBalanceChange(balance - amount)
                 }
                 showBidDialog = false
@@ -567,6 +743,64 @@ fun BiddingScreen(
         )
     }
 }
+
+@Composable
+fun HistoryScreen(
+    username: String,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+
+    // All bids for this user (persisted)
+    val bids by BidsStore
+        .bidsFlow(context, username)
+        .collectAsState(initial = emptyList())
+
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        if (bids.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "No bids yet",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Place a bid to see your history here.",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(bids) { bid ->
+                    HistoryBidCard(bid = bid)
+                }
+            }
+        }
+    }
+}
+
+
+/* =========================
+   CARDS + DIALOGS
+   ========================= */
 
 @Composable
 fun EventCard(
