@@ -1,4 +1,4 @@
-package com.example.apputbid.ui
+package com.example.apputbid.ui.auth
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel

@@ -1,10 +1,9 @@
-package com.example.apputbid
+package com.example.apputbid.ui
 
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,64 +20,24 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.ViewModelProvider
-import com.example.apputbid.ui.AuthViewModel
-import com.example.apputbid.ui.auth.UniBiddingApp
-
-
-
-// Color Scheme
-private val Orange = Color(0xFFFF6B35)
-private val LightOrange = Color(0xFFFF8C61)
-private val Blue = Color(0xFF004E89)
-private val LightBlue = Color(0xFF1A759F)
-private val DarkBackground = Color(0xFF121212)
-private val DarkSurface = Color(0xFF1E1E1E)
-
-private val LightColorScheme = lightColorScheme(
-    primary = Orange,
-    secondary = Blue,
-    tertiary = LightBlue,
-    background = Color(0xFFFFFBF5),
-    surface = Color.White,
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-)
-
-private val DarkColorScheme = darkColorScheme(
-    primary = LightOrange,
-    secondary = LightBlue,
-    tertiary = Blue,
-    background = DarkBackground,
-    surface = DarkSurface,
-    onPrimary = Color.Black,
-    onSecondary = Color.White,
-    onBackground = Color(0xFFE6E1E5),
-    onSurface = Color(0xFFE6E1E5),
-)
-
-@Composable
-fun UniBiddingTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit
-) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
-
-    MaterialTheme(
-        colorScheme = colorScheme,
-        content = content
-    )
-}
-
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.DrawerValue
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import com.example.apputbid.ui.auth.AuthViewModel
+import com.example.apputbid.ui.auth.LoginScreen
+import com.example.apputbid.ui.main.PlayerStats
+import com.example.apputbid.ui.main.ProfileDrawer
+import com.example.apputbid.ui.theme.UniBiddingTheme
+import com.example.apputbid.ui.wallet.WalletScreen
 
 // Bidding data classes
 data class BiddingEvent(
@@ -171,7 +130,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-
 @Composable
 fun UniBiddingApp(vm: AuthViewModel) {
     val state by vm.state.collectAsState()
@@ -185,171 +143,125 @@ fun UniBiddingApp(vm: AuthViewModel) {
     }
 }
 
-
 @Composable
-fun LoginScreen(
-    vm: AuthViewModel,   // <-- comes from your Activity / UniBiddingApp
+fun MainScreen(
+    username: String,
+    onLogout: () -> Unit,
+    initialDarkTheme: Boolean = false  // Add parameter with default value
 ) {
-    val state by vm.state.collectAsState()
-
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-
-    val errorMessage = state.error.orEmpty()
-
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "UTBid",
-                fontSize = 48.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            Text(
-                text = "Place Your Bets",
-                fontSize = 18.sp,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 48.dp)
-            )
-
-            OutlinedTextField(
-                value = username,
-                onValueChange = { username = it },
-                label = { Text("Username") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    focusedLabelColor = MaterialTheme.colorScheme.primary
-                )
-            )
-
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Password") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    focusedLabelColor = MaterialTheme.colorScheme.primary
-                )
-            )
-
-            if (errorMessage.isNotEmpty()) {
-                Text(
-                    text = errorMessage,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Button(
-                onClick = { vm.login(username, password) },   // <-- uses SQLite via ViewModel
-                enabled = !state.loading && username.isNotBlank() && password.isNotBlank(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                Text(
-                    if (state.loading) "Signing in..." else "Login",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedButton(
-                onClick = { vm.register(username, password) },  // <-- SQLite registration
-                enabled = !state.loading && username.isNotBlank() && password.isNotBlank(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.secondary
-                )
-            ) {
-                Text(
-                    if (state.loading) "Creating..." else "Register",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    }
-}
-
-
-
-@Composable
-fun MainScreen(username: String, onLogout: () -> Unit) {
     var selectedTab by remember { mutableStateOf(0) }
     var balance by remember { mutableStateOf(1000.0) }
+    var isDarkTheme by remember { mutableStateOf(initialDarkTheme) }  // Use the parameter
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
 
-    Scaffold(
-        bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp
-            ) {
-                NavigationBarItem(
-                    icon = { Icon(if (selectedTab == 0) Icons.Filled.Home else Icons.Outlined.Home, "Home") },
-                    label = { Text("Home") },
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+    // Mock player stats - you can connect this to real data later
+    val playerStats = remember { PlayerStats(wins = 15, losses = 8) }
+
+    UniBiddingTheme(darkTheme = isDarkTheme) {
+        ProfileDrawer(
+            drawerState = drawerState,
+            username = username,
+            playerStats = playerStats,
+            isDarkTheme = isDarkTheme,
+            onToggleTheme = { isDarkTheme = !isDarkTheme },
+            onLogout = onLogout
+        ) {
+            Scaffold(
+                bottomBar = {
+                    NavigationBar(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 8.dp
+                    ) {
+                        NavigationBarItem(
+                            icon = {
+                                Icon(
+                                    if (selectedTab == 0) Icons.Filled.Home else Icons.Outlined.Home,
+                                    "Home"
+                                )
+                            },
+                            label = { Text("Home") },
+                            selected = selectedTab == 0,
+                            onClick = { selectedTab = 0 },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                            )
+                        )
+                        NavigationBarItem(
+                            icon = {
+                                Icon(
+                                    if (selectedTab == 1) Icons.Filled.List else Icons.Outlined.List,
+                                    "Bidding"
+                                )
+                            },
+                            label = { Text("Bidding") },
+                            selected = selectedTab == 1,
+                            onClick = { selectedTab = 1 },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                            )
+                        )
+                        NavigationBarItem(
+                            icon = {
+                                Icon(
+                                    if (selectedTab == 2) Icons.Filled.AccountCircle else Icons.Outlined.AccountCircle,
+                                    "Wallet"
+                                )
+                            },
+                            label = { Text("Wallet") },
+                            selected = selectedTab == 2,
+                            onClick = { selectedTab = 2 },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                            )
+                        )
+                    }
+                }
+            ) { paddingValues ->
+                when (selectedTab) {
+                    0 -> HomeScreen(
+                        username = username,
+                        balance = balance,
+                        modifier = Modifier.padding(paddingValues),
+                        onMenuClick = {
+                            scope.launch {
+                                drawerState.open()
+                            }
+                        }
                     )
-                )
-                NavigationBarItem(
-                    icon = { Icon(if (selectedTab == 1) Icons.Filled.List else Icons.Outlined.List, "Bidding") },
-                    label = { Text("Bidding") },
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+
+                    1 -> BiddingScreen(
+                        username,
+                        balance,
+                        onBalanceChange = { balance = it },
+                        Modifier.padding(paddingValues)
                     )
-                )
+
+                    2 -> WalletScreen(
+                        balance = balance,
+                        username = username,
+                        onBalanceChange = { balance = it },
+                        onBack = { selectedTab = 0 }
+                    )
+                }
             }
-        }
-    ) { paddingValues ->
-        when (selectedTab) {
-            0 -> HomeScreen(username, balance, Modifier.padding(paddingValues))
-            1 -> BiddingScreen(username, balance, onBalanceChange = { balance = it }, Modifier.padding(paddingValues))
         }
     }
 }
 
 @Composable
-fun HomeScreen(username: String, balance: Double, modifier: Modifier = Modifier) {
+fun HomeScreen(
+    username: String,
+    balance: Double,
+    modifier: Modifier = Modifier,
+    onMenuClick: () -> Unit = {}
+) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedSport by remember { mutableStateOf("All") }
 
@@ -382,114 +294,239 @@ fun HomeScreen(username: String, balance: Double, modifier: Modifier = Modifier)
         games
     }
 
-    LazyColumn(
+    Surface(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        color = MaterialTheme.colorScheme.background
     ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp)
+        ) {
 
-        item {
-            // Top Bar
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.secondary
-            ) {
-                Row(
+            item {
+                // Top Bar
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.secondary,
+                    tonalElevation = 4.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            IconButton(onClick = onMenuClick) {
+                                Icon(
+                                    imageVector = Icons.Default.Menu,
+                                    contentDescription = "Menu",
+                                    tint = MaterialTheme.colorScheme.onSecondary
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = "UTBid",
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSecondary
+                                )
+                                Text(
+                                    text = "Welcome back!",
+                                    fontSize = 14.sp,
+                                    color = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.8f)
+                                )
+                            }
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = username,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSecondary
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Default.AccountCircle,
+                                contentDescription = "User Profile",
+                                modifier = Modifier.size(40.dp),
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                // Search Bar
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
+                    placeholder = { Text("Search teams, sports, or status...") },
+                    leadingIcon = { Icon(Icons.Default.Search, null) },
+                    shape = RoundedCornerShape(24.dp),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    )
+                )
+            }
+
+            item {
+                // Balance Card
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Current Balance",
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Text(
+                            text = "$${"%.2f".format(balance)}",
+                            fontSize = 36.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+            }
+
+            item {
+                Text(
+                    text = "Quick Stats",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
+            item {
+                // Quick Stats
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    StatCard("Active Bids", "0", Modifier.weight(1f))
+                    StatCard("Total Won", "$0.00", Modifier.weight(1f))
+                }
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            item {
+                // Sports Tabs
+                ScrollableTabRow(
+                    selectedTabIndex = sports.indexOf(selectedSport),
+                    containerColor = MaterialTheme.colorScheme.background,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    edgePadding = 0.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    sports.forEach { sport ->
+                        Tab(
+                            selected = selectedSport == sport,
+                            onClick = { selectedSport = sport },
+                            text = {
+                                Text(
+                                    text = sport,
+                                    fontWeight = if (selectedSport == sport) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text("UTBid", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                        Text("Welcome back!")
+                    Text(
+                        text = if (searchQuery.isBlank() && selectedSport == "All") "Recent & Upcoming Games" else "Search Results",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    if (searchQuery.isNotBlank() || selectedSport != "All") {
+                        Text(
+                            text = "${filteredGames.size} found",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                    Icon(
-                        imageVector = Icons.Default.AccountCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp)
+                }
+            }
+
+            if (filteredGames.isEmpty()) {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "No games found",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Try searching for a different team or sport",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                // Game Cards
+                items(filteredGames) { game ->
+                    GameCard(
+                        game = game,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
                     )
                 }
             }
-        }
-
-        item {
-            // Search Bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                placeholder = { Text("Search teams, sports, or status...") },
-                leadingIcon = { Icon(Icons.Default.Search, null) },
-            )
-        }
-
-        item {
-            // Balance Card
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("Current Balance", fontSize = 16.sp)
-                    Text("$${"%.2f".format(balance)}", fontSize = 36.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-
-        item {
-            // Quick Stats
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatCard("Active Bids", "0", Modifier.weight(1f))
-                StatCard("Total Won", "$0.00", Modifier.weight(1f))
-            }
-        }
-
-        item {
-            // Sports Tabs
-            ScrollableTabRow(
-                selectedTabIndex = sports.indexOf(selectedSport),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                sports.forEach { sport ->
-                    Tab(
-                        selected = selectedSport == sport,
-                        onClick = { selectedSport = sport },
-                        text = { Text(sport) }
-                    )
-                }
-            }
-        }
-
-        item {
-            Text(
-                text = if (searchQuery.isBlank() && selectedSport == "All") "Recent & Upcoming Games" else "Search Results",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-        }
-
-        // Game Cards
-        items(filteredGames) { game ->
-            GameCard(
-                game = game,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            )
         }
     }
 }
@@ -638,7 +675,7 @@ fun BiddingScreen(username: String, balance: Double, onBalanceChange: (Double) -
     var selectedTeam by remember { mutableStateOf("") }
 
     var groupedEvents = remember {
-        BiddingDatabase.events.groupBy { it. title }
+        BiddingDatabase.events.groupBy { it.title }
     }
 
     Surface(
@@ -905,19 +942,26 @@ fun BidDialog(
 
 
 
-
 @Preview(showBackground = true)
 @Composable
 fun HomeScreenPreview() {
-    UniBiddingTheme {
-        MainScreen(username = "BigBalla67", onLogout = {})
+    UniBiddingTheme(darkTheme = false) {
+        MainScreen(
+            username = "BigBalla67",
+            onLogout = {},
+            initialDarkTheme = false  // Explicitly pass false for light theme
+        )
     }
 }
 
-@Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun DarkThemePreview() {
     UniBiddingTheme(darkTheme = true) {
-        MainScreen(username = "BigBalla67", onLogout = {})
+        MainScreen(
+            username = "BigBalla67",
+            onLogout = {},
+            initialDarkTheme = true  // Explicitly pass true for dark theme
+        )
     }
 }
