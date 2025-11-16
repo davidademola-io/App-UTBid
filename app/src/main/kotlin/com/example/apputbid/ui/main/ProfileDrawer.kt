@@ -13,6 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.Color
 import com.example.apputbid.ui.theme.UniBiddingTheme
 data class PlayerStats(
     val wins: Int,
@@ -74,7 +75,7 @@ fun ProfileDrawerContent(
                 imageVector = Icons.Default.AccountCircle,
                 contentDescription = null,
                 modifier = Modifier.size(56.dp),
-                tint = MaterialTheme.colorScheme.primary
+                tint = Color(0xFF2196F3)  // Blue color
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column {
@@ -135,7 +136,8 @@ fun ProfileDrawerContent(
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
                 containerColor = if (showHistory) MaterialTheme.colorScheme.primaryContainer
-                else MaterialTheme.colorScheme.secondaryContainer
+                else MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = if (isDarkTheme) Color.White else Color.Black  // Adaptive text color
             )
         ) {
             Icon(
@@ -252,7 +254,8 @@ fun ProfileDrawerContent(
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
                 containerColor = if (showSettings) MaterialTheme.colorScheme.primaryContainer
-                else MaterialTheme.colorScheme.secondaryContainer
+                else MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = if (isDarkTheme) Color.White else Color.Black  // Adaptive text color
             )
         ) {
             Icon(

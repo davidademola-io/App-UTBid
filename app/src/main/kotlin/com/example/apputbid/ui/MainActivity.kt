@@ -853,7 +853,7 @@ fun TeamBidButton(team: String, odds: Double, onClick: () -> Unit, modifier: Mod
         onClick = onClick,
         modifier = modifier.height(80.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
+            containerColor = Color(0xFF2196F3)  // Blue color
         ),
         shape = RoundedCornerShape(12.dp)
     ) {
@@ -864,7 +864,7 @@ fun TeamBidButton(team: String, odds: Double, onClick: () -> Unit, modifier: Mod
                 text = team,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = Color.White,  // White text for better contrast on blue
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(4.dp))
@@ -872,7 +872,7 @@ fun TeamBidButton(team: String, odds: Double, onClick: () -> Unit, modifier: Mod
                 text = "${odds}x",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                color = Color.White  // White odds text
             )
         }
     }
