@@ -7,6 +7,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
@@ -19,6 +23,7 @@ import com.example.apputbid.ui.theme.UniBiddingTheme
 @Composable
 fun LoginScreen(
     vm: AuthViewModel,
+    onAdminClick: () -> Unit = {}
 ) {
     val state by vm.state.collectAsState()
 
@@ -42,14 +47,21 @@ fun LoginScreen(
                 text = "UTBid",
                 fontSize = 48.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.secondary,
+                color = Color(0xFFFF9800),  // Orange color
+                style = TextStyle(
+                    shadow = Shadow(
+                        color = Color.Black.copy(alpha = 0.5f),
+                        offset = Offset(4f, 4f),
+                        blurRadius = 8f
+                    )
+                ),
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
             Text(
                 text = "Place Your Bets",
                 fontSize = 18.sp,
-                color = MaterialTheme.colorScheme.primary,
+                color = Color(0xFF4169E1),  // Royal blue color
                 modifier = Modifier.padding(bottom = 48.dp)
             )
 
@@ -62,8 +74,8 @@ fun LoginScreen(
                     .padding(bottom = 16.dp),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    focusedLabelColor = MaterialTheme.colorScheme.primary
+                    focusedBorderColor = Color(0xFF4169E1),  // Royal blue color
+                    focusedLabelColor = Color(0xFF4169E1)    // Royal blue color
                 )
             )
 
@@ -77,8 +89,8 @@ fun LoginScreen(
                     .padding(bottom = 8.dp),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    focusedLabelColor = MaterialTheme.colorScheme.primary
+                    focusedBorderColor = Color(0xFF4169E1),  // Royal blue color
+                    focusedLabelColor = Color(0xFF4169E1)    // Royal blue color
                 )
             )
 
@@ -100,7 +112,7 @@ fun LoginScreen(
                     .height(56.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
+                    containerColor = Color(0xFF4169E1)  // Royal blue color
                 )
             ) {
                 Text(
@@ -120,7 +132,7 @@ fun LoginScreen(
                     .height(56.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.secondary
+                    contentColor = Color(0xFF4169E1)  // Royal blue color
                 )
             ) {
                 Text(
@@ -129,6 +141,35 @@ fun LoginScreen(
                     fontWeight = FontWeight.Bold
                 )
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            TextButton(
+                onClick = onAdminClick,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    "Admin Login",
+                    fontSize = 14.sp,
+                    color = Color(0xFF4169E1)  // Royal blue color
+                )
+            }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun LoginScreenPreview() {
+    UniBiddingTheme(darkTheme = false) {
+        LoginScreen(vm = viewModel())
+    }
+}
+
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+fun LoginScreenDarkPreview() {
+    UniBiddingTheme(darkTheme = true) {
+        LoginScreen(vm = viewModel())
     }
 }

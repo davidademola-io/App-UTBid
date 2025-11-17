@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +29,7 @@ fun ProfileDrawer(
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit,
     onLogout: () -> Unit,
+    onNavigateToSettings: () -> Unit = {},  // Add navigation callback
     content: @Composable () -> Unit
 ) {
     ModalNavigationDrawer(
@@ -39,7 +41,8 @@ fun ProfileDrawer(
                     playerStats = playerStats,
                     isDarkTheme = isDarkTheme,
                     onToggleTheme = onToggleTheme,
-                    onLogout = onLogout
+                    onLogout = onLogout,
+                    onNavigateToSettings = onNavigateToSettings  // Pass callback
                 )
             }
         }
@@ -54,10 +57,10 @@ fun ProfileDrawerContent(
     playerStats: PlayerStats,
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onNavigateToSettings: () -> Unit = {}  // Add navigation callback
 ) {
     var showHistory by remember { mutableStateOf(false) }
-    var showSettings by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -75,7 +78,7 @@ fun ProfileDrawerContent(
                 imageVector = Icons.Default.AccountCircle,
                 contentDescription = null,
                 modifier = Modifier.size(56.dp),
-                tint = Color(0xFF2196F3)  // Blue color
+                tint = Color(0xFF4169E1)  // Royal blue color
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column {
@@ -250,12 +253,11 @@ fun ProfileDrawerContent(
 
         // Settings Button
         Button(
-            onClick = { showSettings = !showSettings },
+            onClick = onNavigateToSettings,
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
-                containerColor = if (showSettings) MaterialTheme.colorScheme.primaryContainer
-                else MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = if (isDarkTheme) Color.White else Color.Black  // Adaptive text color
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = if (isDarkTheme) Color.White else Color.Black
             )
         ) {
             Icon(
@@ -265,79 +267,12 @@ fun ProfileDrawerContent(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text("Settings")
-        }
-
-        // Show Settings Details
-        if (showSettings) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Account Information",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    // Username
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Column {
-                            Text(
-                                text = "Username",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = username,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-
-                    HorizontalDivider()
-
-                    // Password
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Lock,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Column {
-                            Text(
-                                text = "Password",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "••••••••",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-                }
-            }
+            Spacer(modifier = Modifier.weight(1f))
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
         }
 
         Spacer(modifier = Modifier.weight(1f))

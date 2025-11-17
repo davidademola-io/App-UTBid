@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -35,7 +36,7 @@ fun WalletScreen(
             // Top Bar matching main app style
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.secondary,
+                color = Color(0xFF4169E1),  // Royal blue color
                 tonalElevation = 4.dp
             ) {
                 Row(
@@ -53,7 +54,7 @@ fun WalletScreen(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Back",
-                                tint = MaterialTheme.colorScheme.onSecondary
+                                tint = Color.White  // White icon on royal blue
                             )
                         }
                         Column {
@@ -61,12 +62,12 @@ fun WalletScreen(
                                 text = "Wallet",
                                 fontSize = 24.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondary
+                                color = Color.White  // White text on royal blue
                             )
                             Text(
                                 text = "Manage your funds",
                                 fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.8f)
+                                color = Color.White.copy(alpha = 0.8f)  // Slightly transparent white
                             )
                         }
                     }
@@ -75,7 +76,7 @@ fun WalletScreen(
                         text = username,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSecondary
+                        color = Color.White  // White text on royal blue
                     )
                 }
             }
@@ -340,7 +341,7 @@ fun PaymentMethodButton(
 @Preview(showBackground = true)
 @Composable
 fun WalletScreenPreview() {
-    MaterialTheme {
+    UniBiddingTheme {
         WalletScreen(
             balance = 1000.0,
             username = "BigBalla67",

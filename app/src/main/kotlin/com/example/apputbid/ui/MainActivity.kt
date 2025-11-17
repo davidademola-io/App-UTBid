@@ -38,6 +38,10 @@ import com.example.apputbid.ui.main.PlayerStats
 import com.example.apputbid.ui.main.ProfileDrawer
 import com.example.apputbid.ui.theme.UniBiddingTheme
 import com.example.apputbid.ui.wallet.WalletScreen
+import com.example.apputbid.ui.settings.SettingsScreen
+import com.example.apputbid.ui.admin.AdminLoginScreen
+import com.example.apputbid.ui.admin.AdminDashboard
+import com.example.apputbid.ui.admin.BannedUserScreen
 
 // Bidding data classes
 data class BiddingEvent(
@@ -77,12 +81,14 @@ data class Bid(
 )
 
 object BiddingDatabase {
-    val events = listOf(
+    // Make games mutable for admin to add/update
+    private val _events = mutableListOf(
         BiddingEvent(1, "Men's Soccer", "Blue Ballers", "Kinfolk", 1.8, 2.1, "Sports"),
-        BiddingEvent(1, "Men's Soccer", "Calmation", "DDD FC", 1.5, 2.5, "Sports"),
-        BiddingEvent(2, "Women's Soccer", "Oval Gladiators", "Heavy Flow", 1.9, 1.9, "Sports"),
-        BiddingEvent(2, "Women's Soccer", "Ball Handlers", "The SockHers", 2.0, 1.7, "Sports"),
+        BiddingEvent(2, "Men's Soccer", "Calmation", "DDD FC", 1.5, 2.5, "Sports"),
+        BiddingEvent(3, "Women's Soccer", "Oval Gladiators", "Heavy Flow", 1.9, 1.9, "Sports"),
+        BiddingEvent(4, "Women's Soccer", "Ball Handlers", "The SockHers", 2.0, 1.7, "Sports"),
     )
+    val events: List<BiddingEvent> get() = _events
 
     val teams = listOf(
         Team("Blue Ballers", 12, 3, "Men's Soccer"),
@@ -95,15 +101,79 @@ object BiddingDatabase {
         Team("The SockHers", 6, 9, "Women's Soccer")
     )
 
-    val games = listOf(
-        Game(1, "Blue Ballers", "Kinfolk", 4, 1, "Today, 3:00 PM", "completed", "Men's Soccer"),
-        Game(2, "Oval Gladiators", "Heavy Flow", 2, 3, "Today, 6:30 PM", "completed", "Women's Soccer"),
+    private val _games = mutableListOf(
+        Game(1, "Blue Ballers", "Kinfolk", null, null, "Today, 3:00 PM", "upcoming", "Men's Soccer"),
+        Game(2, "Oval Gladiators", "Heavy Flow", null, null, "Today, 6:30 PM", "upcoming", "Women's Soccer"),
         Game(3, "Calmation", "DDD FC", null, null, "Tomorrow, 4:00 PM", "upcoming", "Men's Soccer"),
-        Game(4, "Ball Handlers", "The SockHers", 3, 2, "Yesterday", "completed", "Women's Soccer"),
+        Game(4, "Ball Handlers", "The SockHers", null, null, "Tomorrow, 7:00 PM", "upcoming", "Women's Soccer"),
     )
+    val games: List<Game> get() = _games
 
     private val userBids = mutableMapOf<String, MutableList<Bid>>()
+    private val userBalances = mutableMapOf<String, Double>()
+    private val bannedUsers = mutableSetOf<String>()
+    private val allUsers = mutableSetOf<String>()
 
+    // User management functions
+    fun addUser(username: String) {
+        allUsers.add(username)
+        if (!userBalances.containsKey(username)) {
+            userBalances[username] = 1000.0
+        }
+    }
+
+    fun getAllUsers(): List<String> = allUsers.toList()
+
+    fun isBanned(username: String): Boolean = bannedUsers.contains(username)
+
+    fun banUser(username: String) {
+        bannedUsers.add(username)
+    }
+
+    fun unbanUser(username: String) {
+        bannedUsers.remove(username)
+    }
+
+    // Game management functions
+    fun addGame(game: Game) {
+        _games.add(game)
+    }
+
+    fun addBiddingEvent(event: BiddingEvent) {
+        _events.add(event)
+    }
+
+    fun updateGameResult(gameId: Int, homeScore: Int, awayScore: Int) {
+        val gameIndex = _games.indexOfFirst { it.id == gameId }
+        if (gameIndex != -1) {
+            val game = _games[gameIndex]
+            _games[gameIndex] = game.copy(
+                homeScore = homeScore,
+                awayScore = awayScore,
+                status = "completed"
+            )
+
+            // Resolve bets for this game
+            resolveBetsForGame(gameId, game.homeTeam, game.awayTeam, homeScore > awayScore)
+        }
+    }
+
+    private fun resolveBetsForGame(gameId: Int, homeTeam: String, awayTeam: String, homeTeamWon: Boolean) {
+        val winningTeam = if (homeTeamWon) homeTeam else awayTeam
+
+        // Find all bids for this game and pay out winners
+        userBids.forEach { (username, bids) ->
+            bids.filter { it.eventId == gameId }.forEach { bid ->
+                if (bid.team == winningTeam) {
+                    val payout = bid.amount * bid.odds
+                    val currentBalance = userBalances[username] ?: 0.0
+                    userBalances[username] = currentBalance + payout
+                }
+            }
+        }
+    }
+
+    // Bidding functions
     fun placeBid(username: String, bid: Bid) {
         if (!userBids.containsKey(username)) {
             userBids[username] = mutableListOf()
@@ -113,6 +183,14 @@ object BiddingDatabase {
 
     fun getUserBids(username: String): List<Bid> {
         return userBids[username] ?: emptyList()
+    }
+
+    fun getUserBalance(username: String): Double {
+        return userBalances[username] ?: 1000.0
+    }
+
+    fun updateUserBalance(username: String, newBalance: Double) {
+        userBalances[username] = newBalance
     }
 }
 
@@ -133,12 +211,36 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun UniBiddingApp(vm: AuthViewModel) {
     val state by vm.state.collectAsState()
+    var showAdminLogin by remember { mutableStateOf(false) }
+    var isAdminLoggedIn by remember { mutableStateOf(false) }
 
-    when (state.currentUser) {
-        null -> LoginScreen(vm = vm)
-        else -> MainScreen(
-            username = state.currentUser!!.username,
-            onLogout = { vm.logout() }
+    // Register user when they log in or register
+    LaunchedEffect(state.currentUser) {
+        state.currentUser?.let { user ->
+            BiddingDatabase.addUser(user.username)
+        }
+    }
+
+    when {
+        isAdminLoggedIn -> AdminDashboard(onLogout = { isAdminLoggedIn = false })
+        showAdminLogin -> AdminLoginScreen(
+            onAdminLogin = { isAdminLoggedIn = true },
+            onBack = { showAdminLogin = false }
+        )
+        state.currentUser != null -> {
+            // Check if user is banned
+            if (BiddingDatabase.isBanned(state.currentUser!!.username)) {
+                BannedUserScreen(onLogout = { vm.logout() })
+            } else {
+                MainScreen(
+                    username = state.currentUser!!.username,
+                    onLogout = { vm.logout() }
+                )
+            }
+        }
+        else -> LoginScreen(
+            vm = vm,
+            onAdminClick = { showAdminLogin = true }
         )
     }
 }
@@ -152,6 +254,8 @@ fun MainScreen(
     var selectedTab by remember { mutableStateOf(0) }
     var balance by remember { mutableStateOf(1000.0) }
     var isDarkTheme by remember { mutableStateOf(initialDarkTheme) }  // Use the parameter
+    var showSettings by remember { mutableStateOf(false) }  // Add settings navigation state
+    var activeBidsCount by remember { mutableStateOf(0) }  // Track active bids count
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -159,99 +263,119 @@ fun MainScreen(
     val playerStats = remember { PlayerStats(wins = 15, losses = 8) }
 
     UniBiddingTheme(darkTheme = isDarkTheme) {
-        ProfileDrawer(
-            drawerState = drawerState,
-            username = username,
-            playerStats = playerStats,
-            isDarkTheme = isDarkTheme,
-            onToggleTheme = { isDarkTheme = !isDarkTheme },
-            onLogout = onLogout
-        ) {
-            Scaffold(
-                bottomBar = {
-                    NavigationBar(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 8.dp
-                    ) {
-                        NavigationBarItem(
-                            icon = {
-                                Icon(
-                                    if (selectedTab == 0) Icons.Filled.Home else Icons.Outlined.Home,
-                                    "Home"
+        // Show Settings Screen when requested
+        if (showSettings) {
+            SettingsScreen(
+                username = username,
+                isDarkTheme = isDarkTheme,
+                onToggleTheme = { isDarkTheme = !isDarkTheme },
+                onBack = { showSettings = false },
+                onLogout = {
+                    showSettings = false
+                    onLogout()
+                }
+            )
+        } else {
+            ProfileDrawer(
+                drawerState = drawerState,
+                username = username,
+                playerStats = playerStats,
+                isDarkTheme = isDarkTheme,
+                onToggleTheme = { isDarkTheme = !isDarkTheme },
+                onLogout = onLogout,
+                onNavigateToSettings = {
+                    scope.launch { drawerState.close() }
+                    showSettings = true
+                }
+            ) {
+                Scaffold(
+                    bottomBar = {
+                        NavigationBar(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            tonalElevation = 8.dp
+                        ) {
+                            NavigationBarItem(
+                                icon = {
+                                    Icon(
+                                        if (selectedTab == 0) Icons.Filled.Home else Icons.Outlined.Home,
+                                        "Home"
+                                    )
+                                },
+                                label = { Text("Home") },
+                                selected = selectedTab == 0,
+                                onClick = { selectedTab = 0 },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                                 )
-                            },
-                            label = { Text("Home") },
-                            selected = selectedTab == 0,
-                            onClick = { selectedTab = 0 },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.primary,
-                                selectedTextColor = MaterialTheme.colorScheme.primary,
-                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                             )
+                            NavigationBarItem(
+                                icon = {
+                                    Icon(
+                                        if (selectedTab == 1) Icons.Filled.List else Icons.Outlined.List,
+                                        "Bidding"
+                                    )
+                                },
+                                label = { Text("Bidding") },
+                                selected = selectedTab == 1,
+                                onClick = { selectedTab = 1 },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                )
+                            )
+                            NavigationBarItem(
+                                icon = {
+                                    Icon(
+                                        if (selectedTab == 2) Icons.Filled.AccountCircle else Icons.Outlined.AccountCircle,
+                                        "Wallet"
+                                    )
+                                },
+                                label = { Text("Wallet") },
+                                selected = selectedTab == 2,
+                                onClick = { selectedTab = 2 },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                )
+                            )
+                        }
+                    }
+                ) { paddingValues ->
+                    when (selectedTab) {
+                        0 -> HomeScreen(
+                            username = username,
+                            balance = balance,
+                            activeBidsCount = activeBidsCount,
+                            modifier = Modifier.padding(paddingValues),
+                            onMenuClick = {
+                                scope.launch {
+                                    drawerState.open()
+                                }
+                            }
                         )
-                        NavigationBarItem(
-                            icon = {
-                                Icon(
-                                    if (selectedTab == 1) Icons.Filled.List else Icons.Outlined.List,
-                                    "Bidding"
-                                )
-                            },
-                            label = { Text("Bidding") },
-                            selected = selectedTab == 1,
-                            onClick = { selectedTab = 1 },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.primary,
-                                selectedTextColor = MaterialTheme.colorScheme.primary,
-                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                            )
+
+                        1 -> BiddingScreen(
+                            username,
+                            balance,
+                            onBalanceChange = { balance = it },
+                            onBidPlaced = { activeBidsCount++ },  // Increment counter when bid is placed
+                            Modifier.padding(paddingValues)
                         )
-                        NavigationBarItem(
-                            icon = {
-                                Icon(
-                                    if (selectedTab == 2) Icons.Filled.AccountCircle else Icons.Outlined.AccountCircle,
-                                    "Wallet"
-                                )
-                            },
-                            label = { Text("Wallet") },
-                            selected = selectedTab == 2,
-                            onClick = { selectedTab = 2 },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.primary,
-                                selectedTextColor = MaterialTheme.colorScheme.primary,
-                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                            )
+
+                        2 -> WalletScreen(
+                            balance = balance,
+                            username = username,
+                            onBalanceChange = { balance = it },
+                            onBack = { selectedTab = 0 }
                         )
                     }
                 }
-            ) { paddingValues ->
-                when (selectedTab) {
-                    0 -> HomeScreen(
-                        username = username,
-                        balance = balance,
-                        modifier = Modifier.padding(paddingValues),
-                        onMenuClick = {
-                            scope.launch {
-                                drawerState.open()
-                            }
-                        }
-                    )
-
-                    1 -> BiddingScreen(
-                        username,
-                        balance,
-                        onBalanceChange = { balance = it },
-                        Modifier.padding(paddingValues)
-                    )
-
-                    2 -> WalletScreen(
-                        balance = balance,
-                        username = username,
-                        onBalanceChange = { balance = it },
-                        onBack = { selectedTab = 0 }
-                    )
-                }
             }
-        }
+        }  // Close else block
     }
 }
 
@@ -259,6 +383,7 @@ fun MainScreen(
 fun HomeScreen(
     username: String,
     balance: Double,
+    activeBidsCount: Int = 0,  // Add parameter for active bids count
     modifier: Modifier = Modifier,
     onMenuClick: () -> Unit = {}
 ) {
@@ -308,7 +433,7 @@ fun HomeScreen(
                 // Top Bar
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = Color(0xFF4169E1),  // Royal blue color
                     tonalElevation = 4.dp
                 ) {
                     Row(
@@ -326,7 +451,7 @@ fun HomeScreen(
                                 Icon(
                                     imageVector = Icons.Default.Menu,
                                     contentDescription = "Menu",
-                                    tint = MaterialTheme.colorScheme.onSecondary
+                                    tint = Color.White  // White icon on blue
                                 )
                             }
                             Column {
@@ -334,12 +459,12 @@ fun HomeScreen(
                                     text = "UTBid",
                                     fontSize = 24.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSecondary
+                                    color = Color.White  // White text on blue
                                 )
                                 Text(
                                     text = "Welcome back!",
                                     fontSize = 14.sp,
-                                    color = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.8f)
+                                    color = Color.White.copy(alpha = 0.8f)  // Slightly transparent white
                                 )
                             }
                         }
@@ -353,14 +478,14 @@ fun HomeScreen(
                                     text = username,
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSecondary
+                                    color = Color.White  // White text on blue
                                 )
                             }
                             Icon(
                                 imageVector = Icons.Default.AccountCircle,
                                 contentDescription = "User Profile",
                                 modifier = Modifier.size(40.dp),
-                                tint = MaterialTheme.colorScheme.onPrimary
+                                tint = Color.White  // White icon on blue
                             )
                         }
                     }
@@ -436,7 +561,7 @@ fun HomeScreen(
                         .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    StatCard("Active Bids", "0", Modifier.weight(1f))
+                    StatCard("Active Bids", activeBidsCount.toString(), Modifier.weight(1f))
                     StatCard("Total Won", "$0.00", Modifier.weight(1f))
                 }
             }
@@ -669,10 +794,17 @@ fun GameCard(game: Game, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun BiddingScreen(username: String, balance: Double, onBalanceChange: (Double) -> Unit, modifier: Modifier = Modifier) {
+fun BiddingScreen(
+    username: String,
+    balance: Double,
+    onBalanceChange: (Double) -> Unit,
+    onBidPlaced: () -> Unit = {},  // Add callback for when bid is placed
+    modifier: Modifier = Modifier
+) {
     var selectedEvent by remember { mutableStateOf<BiddingEvent?>(null) }
     var showBidDialog by remember { mutableStateOf(false) }
     var selectedTeam by remember { mutableStateOf("") }
+    var bidEventIds by remember { mutableStateOf(setOf<Int>()) }  // Track events that have been bid on
 
     var groupedEvents = remember {
         BiddingDatabase.events.groupBy { it.title }
@@ -721,6 +853,7 @@ fun BiddingScreen(username: String, balance: Double, onBalanceChange: (Double) -
                         SportGroupCard(
                             sportTitle = sportTitle,
                             events = events,
+                            bidEventIds = bidEventIds,  // Pass the set of bid event IDs
                             onBidClick = { event, team ->
                                 selectedEvent = event
                                 selectedTeam = team
@@ -747,6 +880,8 @@ fun BiddingScreen(username: String, balance: Double, onBalanceChange: (Double) -
                         Bid(selectedEvent!!.id, selectedEvent!!.title, selectedTeam, amount, odds)
                     )
                     onBalanceChange(balance - amount)
+                    onBidPlaced()  // Increment active bids counter
+                    bidEventIds = bidEventIds + selectedEvent!!.id  // Mark event as bid on
                 }
                 showBidDialog = false
             }
@@ -758,6 +893,7 @@ fun BiddingScreen(username: String, balance: Double, onBalanceChange: (Double) -
 fun SportGroupCard(
     sportTitle: String,
     events: List<BiddingEvent>,
+    bidEventIds: Set<Int>,  // Add parameter for tracking bid events
     onBidClick: (BiddingEvent, String) -> Unit
 ) {
     Card(
@@ -804,6 +940,7 @@ fun SportGroupCard(
             events.forEachIndexed { index, event ->
                 MatchRow(
                     event = event,
+                    isBidPlaced = bidEventIds.contains(event.id),  // Check if bid was placed
                     onBidClick = onBidClick
                 )
 
@@ -824,6 +961,7 @@ fun SportGroupCard(
 @Composable
 fun MatchRow(
     event: BiddingEvent,
+    isBidPlaced: Boolean,  // Add parameter to check if bid was placed
     onBidClick: (BiddingEvent, String) -> Unit
 ) {
     Row(
@@ -833,14 +971,24 @@ fun MatchRow(
         TeamBidButton(
             team = event.team1,
             odds = event.odds1,
-            onClick = { onBidClick(event, event.team1) },
+            onClick = {
+                if (!isBidPlaced) {  // Only allow click if bid not placed
+                    onBidClick(event, event.team1)
+                }
+            },
+            enabled = !isBidPlaced,  // Disable if bid placed
             modifier = Modifier.weight(1f)
         )
 
         TeamBidButton(
             team = event.team2,
             odds = event.odds2,
-            onClick = { onBidClick(event, event.team2) },
+            onClick = {
+                if (!isBidPlaced) {  // Only allow click if bid not placed
+                    onBidClick(event, event.team2)
+                }
+            },
+            enabled = !isBidPlaced,  // Disable if bid placed
             modifier = Modifier.weight(1f)
         )
     }
@@ -848,12 +996,24 @@ fun MatchRow(
 
 
 @Composable
-fun TeamBidButton(team: String, odds: Double, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun TeamBidButton(
+    team: String,
+    odds: Double,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true  // Add enabled parameter
+) {
     Button(
         onClick = onClick,
         modifier = modifier.height(80.dp),
+        enabled = enabled,  // Use enabled parameter
         colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xFF2196F3)  // Blue color
+            containerColor = if (enabled) {
+                Color(0xFFE3F2FD)  // Light, transparent-looking blue when enabled
+            } else {
+                Color(0xFFE0E0E0)  // Gray when disabled
+            },
+            disabledContainerColor = Color(0xFFE0E0E0)  // Gray when disabled
         ),
         shape = RoundedCornerShape(12.dp)
     ) {
@@ -864,7 +1024,11 @@ fun TeamBidButton(team: String, odds: Double, onClick: () -> Unit, modifier: Mod
                 text = team,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,  // White text for better contrast on blue
+                color = if (enabled) {
+                    Color(0xFF1976D2)  // Darker blue text when enabled
+                } else {
+                    Color(0xFF9E9E9E)  // Gray text when disabled
+                },
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(4.dp))
@@ -872,7 +1036,11 @@ fun TeamBidButton(team: String, odds: Double, onClick: () -> Unit, modifier: Mod
                 text = "${odds}x",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White  // White odds text
+                color = if (enabled) {
+                    Color(0xFF1976D2)  // Darker blue for odds when enabled
+                } else {
+                    Color(0xFF9E9E9E)  // Gray for odds when disabled
+                }
             )
         }
     }
