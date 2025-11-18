@@ -66,10 +66,29 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
 
     fun login(username: String, password: String) {
         _state.value = _state.value.copy(loading = true, error = null)
+
         viewModelScope.launch {
+            // 1) Check if the user is banned **before** trying to authenticate
+            val isBanned = try {
+                repo.isBanned(username)
+            } catch (t: Throwable) {
+                t.printStackTrace()
+                false  // if something goes wrong, don't block login just from this
+            }
+
+            if (isBanned) {
+                // Show message in the same way other auth errors show on LoginScreen
+                _state.value = _state.value.copy(
+                    loading = false,
+                    error = "Your account has been locked. Please contact customer service."
+                )
+                return@launch
+            }
+
+            // 2) Proceed with normal login flow if not banned
             val res = repo.login(username, password.toCharArray())
             _state.value = if (res.isSuccess) {
-                BiddingDatabase.ensureUser(username) // <-- makes sure they’re listed + $20 if new
+                BiddingDatabase.ensureUser(username) // still ensures they appear in Admin + $20 if new
                 _state.value.copy(
                     loading = false,
                     currentUser = res.getOrNull(),
@@ -77,10 +96,14 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
                     isAdmin = false
                 )
             } else {
-                _state.value.copy(loading = false, error = res.exceptionOrNull()?.message)
+                _state.value.copy(
+                    loading = false,
+                    error = res.exceptionOrNull()?.message
+                )
             }
         }
     }
+
 
     fun logout() {
         _state.value = AuthState(route = Route.Login)
