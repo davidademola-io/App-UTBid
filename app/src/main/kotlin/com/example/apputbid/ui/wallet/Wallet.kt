@@ -344,7 +344,7 @@ fun WalletScreenPreview() {
     UniBiddingTheme {
         WalletScreen(
             balance = 1000.0,
-            username = "BigBalla67",
+            username = "LittleBro67",
             onBalanceChange = {},
             onBack = {}
         )

@@ -306,7 +306,7 @@ fun ProfileDrawerPreview() {
 
         ProfileDrawer(
             drawerState = drawerState,
-            username = "BigBalla67",
+            username = "LittleBro67",
             playerStats = PlayerStats(wins = 15, losses = 8),
             isDarkTheme = false,
             onToggleTheme = {},
@@ -339,7 +339,7 @@ fun ProfileDrawerDarkPreview() {
 
         ProfileDrawer(
             drawerState = drawerState,
-            username = "BigBalla67",
+            username = "LittleBro67",
             playerStats = PlayerStats(wins = 15, losses = 8),
             isDarkTheme = true,
             onToggleTheme = {},

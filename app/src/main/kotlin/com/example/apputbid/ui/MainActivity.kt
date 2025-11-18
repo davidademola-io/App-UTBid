@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -85,27 +86,27 @@ object BiddingDatabase {
     private val _events = mutableListOf(
         BiddingEvent(1, "Men's Soccer", "Blue Ballers", "Kinfolk", 1.8, 2.1, "Sports"),
         BiddingEvent(2, "Men's Soccer", "Calmation", "DDD FC", 1.5, 2.5, "Sports"),
-        BiddingEvent(3, "Women's Soccer", "Oval Gladiators", "Heavy Flow", 1.9, 1.9, "Sports"),
-        BiddingEvent(4, "Women's Soccer", "Ball Handlers", "The SockHers", 2.0, 1.7, "Sports"),
+        BiddingEvent(3, "Women's Soccer", "Purple Thunder", "The Procrastinators", 1.9, 1.9, "Sports"),
+        BiddingEvent(4, "Women's Soccer", "Touch Grass FC", "Honey Badgers", 2.0, 1.7, "Sports"),
     )
     val events: List<BiddingEvent> get() = _events
 
     val teams = listOf(
         Team("Blue Ballers", 12, 3, "Men's Soccer"),
         Team("Kinfolk", 10, 5, "Men's Soccer"),
-        Team("Oval Gladiators", 8, 7, "Women's Soccer"),
-        Team("Heavy Flow", 11, 4, "Women's Soccer"),
+        Team("Purple Thunder", 8, 7, "Women's Soccer"),
+        Team("The Procrastinators", 11, 4, "Women's Soccer"),
         Team("DDD FC", 9, 6, "Men's Soccer"),
         Team("Calmation", 7, 8, "Men's Soccer"),
-        Team("Ball Handlers", 13, 2, "Women's Soccer"),
-        Team("The SockHers", 6, 9, "Women's Soccer")
+        Team("Touch Grass FC", 13, 2, "Women's Soccer"),
+        Team("Honey Badgers", 6, 9, "Women's Soccer")
     )
 
     private val _games = mutableListOf(
         Game(1, "Blue Ballers", "Kinfolk", null, null, "Today, 3:00 PM", "upcoming", "Men's Soccer"),
-        Game(2, "Oval Gladiators", "Heavy Flow", null, null, "Today, 6:30 PM", "upcoming", "Women's Soccer"),
+        Game(2, "Purple Thunder", "The Procrastinators", null, null, "Today, 6:30 PM", "upcoming", "Women's Soccer"),
         Game(3, "Calmation", "DDD FC", null, null, "Tomorrow, 4:00 PM", "upcoming", "Men's Soccer"),
-        Game(4, "Ball Handlers", "The SockHers", null, null, "Tomorrow, 7:00 PM", "upcoming", "Women's Soccer"),
+        Game(4, "Touch Grass FC", "Honey Badgers", null, null, "Tomorrow, 7:00 PM", "upcoming", "Women's Soccer"),
     )
     val games: List<Game> get() = _games
 
@@ -199,6 +200,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val authViewModel = ViewModelProvider(this)[AuthViewModel::class.java]
+        window.statusBarColor = Color(0xFF4169E1).toArgb()
 
         setContent {
             UniBiddingTheme {
@@ -1115,7 +1117,7 @@ fun BidDialog(
 fun HomeScreenPreview() {
     UniBiddingTheme(darkTheme = false) {
         MainScreen(
-            username = "BigBalla67",
+            username = "LittleBro67",
             onLogout = {},
             initialDarkTheme = false  // Explicitly pass false for light theme
         )
@@ -1127,7 +1129,7 @@ fun HomeScreenPreview() {
 fun DarkThemePreview() {
     UniBiddingTheme(darkTheme = true) {
         MainScreen(
-            username = "BigBalla67",
+            username = "LittleBro67",
             onLogout = {},
             initialDarkTheme = true  // Explicitly pass true for dark theme
         )

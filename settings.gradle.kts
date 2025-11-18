@@ -6,7 +6,7 @@ pluginManagement {
     }
     plugins {
         // you likely already have these two:
-        id("com.android.application") version "8.7.0"
+        id("com.android.application") version "8.13.1"
         kotlin("android") version "2.0.21"
 
         // 👇 add this line

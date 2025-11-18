@@ -17,6 +17,10 @@ import androidx.compose.ui.unit.sp
 import com.example.apputbid.ui.BiddingDatabase
 import com.example.apputbid.ui.Game
 
+import android.content.res.Configuration
+import androidx.compose.ui.tooling.preview.Preview
+import com.example.apputbid.ui.theme.UniBiddingTheme
+
 @Composable
 fun AdminLoginScreen(onAdminLogin: () -> Unit, onBack: () -> Unit) {
     var username by remember { mutableStateOf("") }
@@ -160,35 +164,31 @@ fun BannedUserScreen(onLogout: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminDashboard(onLogout: () -> Unit) {
     var selectedSection by remember { mutableStateOf(0) }
 
     Scaffold(
         topBar = {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = Color(0xFF4169E1),  // Royal blue
-                tonalElevation = 4.dp
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            TopAppBar(
+                title = {
                     Text(
                         "Admin Dashboard",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
                     )
+                },
+                actions = {
                     TextButton(onClick = onLogout) {
                         Text("Logout", color = Color.White)
                     }
-                }
-            }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFF4169E1),
+                    titleContentColor = Color.White
+                )
+            )
         }
     ) { paddingValues ->
         Column(
@@ -653,5 +653,108 @@ fun SetGameResultScreen(game: Game, onBack: () -> Unit) {
         ) {
             Text("Set Result & Resolve Bets", fontSize = 18.sp, fontWeight = FontWeight.Bold)
         }
+    }
+}
+@Preview(showBackground = true)
+@Composable
+fun AdminLoginScreenPreview() {
+    UniBiddingTheme {
+        AdminLoginScreen(
+            onAdminLogin = {},
+            onBack = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun BannedUserScreenPreview() {
+    UniBiddingTheme {
+        BannedUserScreen(
+            onLogout = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun AdminDashboardPreview() {
+    UniBiddingTheme {
+        AdminDashboard(
+            onLogout = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun UsersSectionPreview() {
+    UniBiddingTheme {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            UsersSection()
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun AddGameSectionPreview() {
+    UniBiddingTheme {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            AddGameSection()
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun SetResultsSectionPreview() {
+    UniBiddingTheme {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            SetResultsSection()
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun SetGameResultScreenPreview() {
+    val sampleGame = Game(
+        id = 1,
+        homeTeam = "Texas Longhorns",
+        awayTeam = "Oklahoma Sooners",
+        homeScore = null,
+        awayScore = null,
+        date = "Tomorrow, 4:00 PM",
+        status = "upcoming",
+        sport = "Men's Football"
+    )
+
+    UniBiddingTheme {
+        SetGameResultScreen(
+            game = sampleGame,
+            onBack = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+fun AdminLoginScreenDarkPreview() {
+    UniBiddingTheme(darkTheme = true) {
+        AdminLoginScreen(
+            onAdminLogin = {},
+            onBack = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+fun AdminDashboardDarkPreview() {
+    UniBiddingTheme(darkTheme = true) {
+        AdminDashboard(
+            onLogout = {}
+        )
     }
 }
