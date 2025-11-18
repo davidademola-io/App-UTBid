@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Search
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -21,19 +23,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.apputbid.data.BalanceStore
 import kotlinx.coroutines.launch
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.runtime.collectAsState
+import com.example.apputbid.data.BalanceStore
 import com.example.apputbid.data.BidsStore
-//import androidx.compose.material.icons.filled.History
-//import androidx.compose.material.icons.outlined.History
-import com.example.apputbid.ui.main.Bid
+import com.example.apputbid.ui.main.BiddingDatabase
+import com.example.apputbid.ui.main.Game
+import com.example.apputbid.ui.main.BiddingEvent
 
+/* =========================
+   MAIN SCREEN + NAV BAR
+   ========================= */
 
-
-
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     username: String,
@@ -42,21 +43,16 @@ fun MainScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // Read the persisted balance from DataStore
-    val balanceState = BalanceStore
+    // Persisted balance
+    val balance by BalanceStore
         .balanceFlow(context)
         .collectAsState(initial = BalanceStore.DEFAULT_BALANCE)
 
     var selectedTab by remember { mutableStateOf(0) }
+    var showAccountSheet by remember { mutableStateOf(false) }
 
-    // Current balance is always whatever DataStore has stored
-    val balance = balanceState.value
-
-    // When the UI wants to change the balance, update DataStore
     val updateBalance: (Double) -> Unit = { newBalance ->
-        scope.launch {
-            BalanceStore.setBalance(context, newBalance)
-        }
+        scope.launch { BalanceStore.setBalance(context, newBalance) }
     }
 
     Scaffold(
@@ -97,14 +93,8 @@ fun MainScreen(
                         indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                     )
                 )
-                // 🔽 New History tab
                 NavigationBarItem(
-                    icon = {
-//                        Icon(
-//                            if (selectedTab == 2) Icons.Filled.History else Icons.Outlined.History,
-//                            contentDescription = "History"
-//                        )
-                    },
+                    icon = { Icon(Icons.Filled.History, contentDescription = "History") },
                     label = { Text("History") },
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
@@ -121,17 +111,15 @@ fun MainScreen(
             0 -> HomeScreen(
                 username = username,
                 balance = balance,
-                modifier = Modifier.padding(paddingValues)
+                modifier = Modifier.padding(paddingValues),
+                onProfileClick = { showAccountSheet = true }   // NEW: open slide menu
             )
-
             1 -> BiddingScreen(
                 username = username,
                 balance = balance,
                 onBalanceChange = updateBalance,
                 modifier = Modifier.padding(paddingValues)
             )
-
-            // 🔽 Hook up the History screen
             2 -> HistoryScreen(
                 username = username,
                 modifier = Modifier.padding(paddingValues)
@@ -139,8 +127,36 @@ fun MainScreen(
         }
     }
 
-}
+    // Sliding account menu (bottom sheet) with Logout
+    if (showAccountSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showAccountSheet = false },
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("Account", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text("Logged in as $username")
 
+                Spacer(Modifier.height(8.dp))
+
+                ListItem(
+                    headlineContent = { Text("Logout") },
+                    modifier = Modifier.clickable {
+                        showAccountSheet = false
+                        onLogout()
+                    }
+                )
+
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+    }
+}
 
 /* =========================
    HOME SCREEN + STATS
@@ -150,9 +166,10 @@ fun MainScreen(
 fun HomeScreen(
     username: String,
     balance: Double,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onProfileClick: () -> Unit   // NEW: callback from MainScreen
 ) {
-    val context = LocalContext.current   // 👈 add this
+    val context = LocalContext.current
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedSport by remember { mutableStateOf("All") }
@@ -170,11 +187,7 @@ fun HomeScreen(
 
     val filteredGames = remember(searchQuery, selectedSport) {
         var games = BiddingDatabase.games
-
-        if (selectedSport != "All") {
-            games = games.filter { it.sport == selectedSport }
-        }
-
+        if (selectedSport != "All") games = games.filter { it.sport == selectedSport }
         if (searchQuery.isNotBlank()) {
             games = games.filter { game ->
                 game.homeTeam.contains(searchQuery, ignoreCase = true) ||
@@ -183,19 +196,12 @@ fun HomeScreen(
                         game.status.contains(searchQuery, ignoreCase = true)
             }
         }
-
         games
     }
 
-    Surface(
-        modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-
-            // Top Bar
+    Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(Modifier.fillMaxSize()) {
+            // Top bar
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.secondary,
@@ -221,30 +227,29 @@ fun HomeScreen(
                             color = MaterialTheme.colorScheme.onSecondary
                         )
                     }
-
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text = username,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSecondary
-                            )
-                        }
+                        Text(
+                            text = username,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSecondary
+                        )
                         Icon(
                             imageVector = Icons.Filled.AccountCircle,
                             contentDescription = "User Profile",
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clickable { onProfileClick() },  // NEW: opens sheet
                             tint = MaterialTheme.colorScheme.onSecondary
                         )
                     }
                 }
             }
 
-            // Search bar
+            // Search
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -252,12 +257,7 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .padding(16.dp),
                 placeholder = { Text("Search teams, sports, or status...") },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Filled.Search,
-                        contentDescription = "Search"
-                    )
-                },
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search") },
                 shape = RoundedCornerShape(24.dp),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
@@ -266,7 +266,7 @@ fun HomeScreen(
                 )
             )
 
-            // Main area
+            // Main content
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -290,12 +290,11 @@ fun HomeScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "Current Balance",
-                            fontSize = 16.sp,
+                            "Current Balance",
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                         Text(
-                            text = "$${"%.2f".format(balance)}",
+                            "$${"%.2f".format(balance)}",
                             fontSize = 36.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
@@ -315,19 +314,12 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Active Bids stat card (clickable)
                     StatCard(
                         title = "Active Bids",
                         value = activeBidsCount.toString(),
                         modifier = Modifier.weight(1f),
-                        onClick = {
-                            if (activeBidsCount > 0) {
-                                showActiveBidsDialog = true
-                            }
-                        }
+                        onClick = { if (activeBidsCount > 0) showActiveBidsDialog = true }
                     )
-
-                    // Total Won – placeholder for now
                     StatCard(
                         title = "Total Won",
                         value = "$0.00",
@@ -335,9 +327,9 @@ fun HomeScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(Modifier.height(16.dp))
 
-                // Sports Filter Tabs
+                // Sport filter tabs
                 ScrollableTabRow(
                     selectedTabIndex = sports.indexOf(selectedSport),
                     containerColor = MaterialTheme.colorScheme.background,
@@ -359,20 +351,18 @@ fun HomeScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(Modifier.height(16.dp))
 
-                // Games list header
+                // List header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (searchQuery.isBlank() && selectedSport == "All") {
-                            "Recent & Upcoming Games"
-                        } else {
-                            "Search Results"
-                        },
+                        text =
+                            if (searchQuery.isBlank() && selectedSport == "All") "Recent & Upcoming Games"
+                            else "Search Results",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground,
@@ -400,7 +390,7 @@ fun HomeScreen(
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(Modifier.height(8.dp))
                         Text(
                             text = "Try searching for a different team or sport",
                             fontSize = 14.sp,
@@ -409,12 +399,8 @@ fun HomeScreen(
                         )
                     }
                 } else {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(filteredGames) { game ->
-                            GameCard(game)
-                        }
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(filteredGames) { game -> GameCard(game) }
                     }
                 }
             }
@@ -422,11 +408,319 @@ fun HomeScreen(
 
         if (showActiveBidsDialog) {
             ActiveBidsDialog(
-                bids = userBids,                      // ✅ now from DataStore
+                bids = userBids,
                 onDismiss = { showActiveBidsDialog = false }
             )
         }
     }
+}
+
+/* =========================
+   BIDDING SCREEN
+   ========================= */
+
+@Composable
+fun BiddingScreen(
+    username: String,
+    balance: Double,
+    onBalanceChange: (Double) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var selectedEvent by remember { mutableStateOf<BiddingEvent?>(null) }
+    var showBidDialog by remember { mutableStateOf(false) }
+    var selectedTeam by remember { mutableStateOf("") }
+
+    Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(Modifier.fillMaxSize()) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.primary,
+                tonalElevation = 4.dp
+            ) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "Available Events",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Text(
+                        text = "Balance: $${"%.2f".format(balance)}",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                    )
+                }
+            }
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(BiddingDatabase.events) { event ->
+                    EventCard(
+                        event = event,
+                        onBidClick = { team ->
+                            selectedEvent = event
+                            selectedTeam = team
+                            showBidDialog = true
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    if (showBidDialog && selectedEvent != null) {
+        BidDialog(
+            event = selectedEvent!!,
+            team = selectedTeam,
+            balance = balance,
+            onDismiss = { showBidDialog = false },
+            onConfirm = { amount ->
+                if (amount <= balance) {
+                    val odds = if (selectedTeam == selectedEvent!!.team1)
+                        selectedEvent!!.odds1 else selectedEvent!!.odds2
+
+                    scope.launch {
+                        BidsStore.addBid(
+                            context = context,
+                            username = username,
+                            bid = Bid(
+                                eventId = selectedEvent!!.id,
+                                eventTitle = selectedEvent!!.title,
+                                team = selectedTeam,
+                                amount = amount,
+                                odds = odds
+                            )
+                        )
+                    }
+
+                    onBalanceChange(balance - amount)
+                }
+                showBidDialog = false
+            }
+        )
+    }
+}
+
+/* =========================
+   HISTORY
+   ========================= */
+
+@Composable
+fun HistoryScreen(
+    username: String,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val bids by BidsStore
+        .bidsFlow(context, username)
+        .collectAsState(initial = emptyList())
+
+    Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        if (bids.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "No bids yet",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Place a bid to see your history here.",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(bids) { bid -> HistoryBidCard(bid = bid) }
+            }
+        }
+    }
+}
+
+/* =========================
+   CARDS + DIALOGS
+   ========================= */
+
+@Composable
+fun EventCard(
+    event: BiddingEvent,
+    onBidClick: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = event.title,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = event.category,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                TeamBidButton(
+                    team = event.team1,
+                    odds = event.odds1,
+                    onClick = { onBidClick(event.team1) },
+                    modifier = Modifier.weight(1f)
+                )
+                TeamBidButton(
+                    team = event.team2,
+                    odds = event.odds2,
+                    onClick = { onBidClick(event.team2) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TeamBidButton(
+    team: String,
+    odds: Double,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(80.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = team,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "${odds}x",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+@Composable
+fun BidDialog(
+    event: BiddingEvent,
+    team: String,
+    balance: Double,
+    onDismiss: () -> Unit,
+    onConfirm: (Double) -> Unit
+) {
+    var bidAmount by remember { mutableStateOf("") }
+    val odds = if (team == event.team1) event.odds1 else event.odds2
+    val potentialWin = bidAmount.toDoubleOrNull()?.let { it * odds } ?: 0.0
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Place Bid", fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                Text("Event: ${event.title}")
+                Text(
+                    "Team: $team",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text("Odds: ${odds}x")
+                Spacer(Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = bidAmount,
+                    onValueChange = { input ->
+                        bidAmount = input.filter { it.isDigit() || it == '.' }
+                    },
+                    label = { Text("Bid Amount") },
+                    prefix = { Text("$") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Potential Win: $${"%.2f".format(potentialWin)}",
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Available Balance: $${"%.2f".format(balance)}",
+                    fontSize = 12.sp
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val amount = bidAmount.toDoubleOrNull()
+                    if (amount != null && amount > 0 && amount <= balance) onConfirm(amount)
+                },
+                enabled = bidAmount.toDoubleOrNull()?.let { it > 0 && it <= balance } ?: false
+            ) {
+                Text("Confirm Bid")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable
@@ -436,9 +730,7 @@ fun HistoryBidCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
@@ -446,100 +738,20 @@ fun HistoryBidCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
+            Text(bid.eventTitle, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
+            Text("Team: ${bid.team}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(4.dp))
             Text(
-                text = bid.eventTitle,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Team: ${bid.team}",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Amount: $${"%.2f".format(bid.amount)}",
-                fontSize = 14.sp,
+                "Amount: $${"%.2f".format(bid.amount)}",
                 fontWeight = FontWeight.Medium
             )
-            Text(
-                text = "Odds: ${bid.odds}x",
-                fontSize = 14.sp
-            )
-            Spacer(modifier = Modifier.height(4.dp))
+            Text("Odds: ${bid.odds}x")
+            Spacer(Modifier.height(4.dp))
             Text(
                 text = "Potential win: $${"%.2f".format(bid.amount * bid.odds)}",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.primary
-            )
-        }
-    }
-}
-
-
-@Composable
-fun GameCard(
-    game: Game,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            // Top row: sport + date
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = game.sport,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = game.date,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Teams + optional score
-            val homeScoreText = game.homeScore?.toString() ?: "-"
-            val awayScoreText = game.awayScore?.toString() ?: "-"
-
-            Text(
-                text = "${game.homeTeam} $homeScoreText  vs  $awayScoreText ${game.awayTeam}",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Status (completed / upcoming etc.)
-            Text(
-                text = game.status.replaceFirstChar { it.uppercase() },
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = when (game.status.lowercase()) {
-                    "completed" -> MaterialTheme.colorScheme.secondary
-                    "upcoming"  -> MaterialTheme.colorScheme.primary
-                    else        -> MaterialTheme.colorScheme.onSurfaceVariant
-                }
             )
         }
     }
@@ -637,178 +849,13 @@ fun ActiveBidsDialog(
     )
 }
 
-/* =========================
-   BIDDING SCREEN
-   ========================= */
-
 @Composable
-fun BiddingScreen(
-    username: String,
-    balance: Double,
-    onBalanceChange: (Double) -> Unit,
+fun GameCard(
+    game: Game,
     modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    var selectedEvent by remember { mutableStateOf<BiddingEvent?>(null) }
-    var showBidDialog by remember { mutableStateOf(false) }
-    var selectedTeam by remember { mutableStateOf("") }
-
-    Surface(
-        modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Header
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.primary,
-                tonalElevation = 4.dp
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Text(
-                        text = "Available Events",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                    Text(
-                        text = "Balance: $${"%.2f".format(balance)}",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
-                    )
-                }
-            }
-
-            // Events list
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(BiddingDatabase.events) { event ->
-                    EventCard(
-                        event = event,
-                        onBidClick = { team ->
-                            selectedEvent = event
-                            selectedTeam = team
-                            showBidDialog = true
-                        }
-                    )
-                }
-            }
-        }
-    }
-
-    if (showBidDialog && selectedEvent != null) {
-        BidDialog(
-            event = selectedEvent!!,
-            team = selectedTeam,
-            balance = balance,
-            onDismiss = { showBidDialog = false },
-            onConfirm = { amount ->
-                if (amount <= balance) {
-                    val odds = if (selectedTeam == selectedEvent!!.team1)
-                        selectedEvent!!.odds1
-                    else
-                        selectedEvent!!.odds2
-
-                    // 🔽 Save bid to persistent storage
-                    scope.launch {
-                        BidsStore.addBid(
-                            context = context,
-                            username = username,
-                            bid = Bid(
-                                eventId = selectedEvent!!.id,
-                                eventTitle = selectedEvent!!.title,
-                                team = selectedTeam,
-                                amount = amount,
-                                odds = odds
-                            )
-                        )
-                    }
-
-                    // 🔽 Update balance (also persisted via BalanceStore already)
-                    onBalanceChange(balance - amount)
-                }
-                showBidDialog = false
-            }
-        )
-    }
-}
-
-@Composable
-fun HistoryScreen(
-    username: String,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-
-    // All bids for this user (persisted)
-    val bids by BidsStore
-        .bidsFlow(context, username)
-        .collectAsState(initial = emptyList())
-
-    Surface(
-        modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        if (bids.isEmpty()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = "No bids yet",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Place a bid to see your history here.",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(bids) { bid ->
-                    HistoryBidCard(bid = bid)
-                }
-            }
-        }
-    }
-}
-
-
-/* =========================
-   CARDS + DIALOGS
-   ========================= */
-
-@Composable
-fun EventCard(
-    event: BiddingEvent,
-    onBidClick: (String) -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -819,153 +866,47 @@ fun EventCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
+            // Top row: sport + date
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = event.title,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = event.category,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                TeamBidButton(
-                    team = event.team1,
-                    odds = event.odds1,
-                    onClick = { onBidClick(event.team1) },
-                    modifier = Modifier.weight(1f)
-                )
-                TeamBidButton(
-                    team = event.team2,
-                    odds = event.odds2,
-                    onClick = { onBidClick(event.team2) },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun TeamBidButton(
-    team: String,
-    odds: Double,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Button(
-        onClick = onClick,
-        modifier = modifier.height(80.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        ),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = team,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "${odds}x",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-    }
-}
-
-@Composable
-fun BidDialog(
-    event: BiddingEvent,
-    team: String,
-    balance: Double,
-    onDismiss: () -> Unit,
-    onConfirm: (Double) -> Unit
-) {
-    var bidAmount by remember { mutableStateOf("") }
-    val odds = if (team == event.team1) event.odds1 else event.odds2
-    val potentialWin = bidAmount.toDoubleOrNull()?.let { it * odds } ?: 0.0
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(text = "Place Bid", fontWeight = FontWeight.Bold) },
-        text = {
-            Column {
-                Text("Event: ${event.title}")
-                Text(
-                    text = "Team: $team",
-                    fontWeight = FontWeight.Bold,
+                    text = game.sport,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Text("Odds: ${odds}x")
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = bidAmount,
-                    onValueChange = {
-                        bidAmount = it.filter { ch -> ch.isDigit() || ch == '.' }
-                    },
-                    label = { Text("Bid Amount") },
-                    prefix = { Text("$") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Potential Win: $${"%.2f".format(potentialWin)}",
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Available Balance: $${"%.2f".format(balance)}",
-                    fontSize = 12.sp
+                    text = game.date,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val amount = bidAmount.toDoubleOrNull()
-                    if (amount != null && amount > 0 && amount <= balance) {
-                        onConfirm(amount)
-                    }
-                },
-                enabled = bidAmount.toDoubleOrNull()?.let { it > 0 && it <= balance } ?: false
-            ) {
-                Text("Confirm Bid")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            // Teams + optional score
+            val homeScoreText = game.homeScore?.toString() ?: "-"
+            val awayScoreText = game.awayScore?.toString() ?: "-"
+            Text(
+                text = "${game.homeTeam} $homeScoreText vs $awayScoreText ${game.awayTeam}",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+            // Status (completed / upcoming etc.)
+            Text(
+                text = game.status.replaceFirstChar { it.uppercase() },
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = when (game.status.lowercase()) {
+                    "completed" -> MaterialTheme.colorScheme.secondary
+                    "upcoming" -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
         }
-    )
+    }
 }

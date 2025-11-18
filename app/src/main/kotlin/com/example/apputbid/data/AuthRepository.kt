@@ -6,6 +6,12 @@ import kotlinx.coroutines.withContext
 
 class AuthRepository(private val db: UserDbHelper) {
 
+    suspend fun getAllUsernames(): List<String> =
+        withContext(Dispatchers.IO) {
+            db.getAllUsernames()
+        }
+
+
     suspend fun register(username: String, password: CharArray): Result<Long> =
         withContext(Dispatchers.IO) {
             if (username.isBlank() || password.isEmpty())
@@ -42,4 +48,20 @@ class AuthRepository(private val db: UserDbHelper) {
                 Result.failure(IllegalArgumentException("Invalid username or password"))
             }
         }
+
+    suspend fun setBanned(username: String, banned: Boolean) =
+        withContext(Dispatchers.IO) {
+            db.setUserBanned(username, banned)
+        }
+
+    suspend fun isBanned(username: String): Boolean =
+        withContext(Dispatchers.IO) {
+            db.isUserBanned(username)
+        }
+
+    suspend fun getAllBannedUsernames(): List<String> =
+        withContext(Dispatchers.IO) {
+            db.getAllBannedUsernames()
+        }
+
 }

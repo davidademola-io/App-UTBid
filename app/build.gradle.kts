@@ -18,13 +18,29 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
+
+
     buildTypes {
+        debug {
+            // Local hardcoded admin passcode for testing
+            buildConfigField("String", "ADMIN_PASSCODE", "\"1234\"")
+            isMinifyEnabled = false
+        }
+
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+
+            // Use environment variable for secure builds
+            val adminPass = System.getenv("ADMIN_PASSCODE") ?: "set_me"
+            buildConfigField("String", "ADMIN_PASSCODE", "\"${adminPass}\"")
         }
     }
 
@@ -55,6 +71,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.3")
     implementation("androidx.datastore:datastore-preferences:1.1.7")
     implementation("com.google.code.gson:gson:2.11.0")
+    implementation("androidx.compose.material:material-icons-extended")
+
 
 
 
