@@ -45,15 +45,18 @@ fun MainScreen(
 
     // Persisted balance
     val balance by BalanceStore
-        .balanceFlow(context)
+        .balanceFlow(context, username)
         .collectAsState(initial = BalanceStore.DEFAULT_BALANCE)
+
+
 
     var selectedTab by remember { mutableStateOf(0) }
     var showAccountSheet by remember { mutableStateOf(false) }
 
     val updateBalance: (Double) -> Unit = { newBalance ->
-        scope.launch { BalanceStore.setBalance(context, newBalance) }
+        scope.launch { BalanceStore.setBalance(context, username, newBalance) }
     }
+
 
     Scaffold(
         bottomBar = {
@@ -171,6 +174,34 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
 
+    // Only bets that are still active (game not resolved yet)
+    val activeBets by remember(username) {
+        derivedStateOf {
+            BiddingDatabase.getActiveBetsForUser(username)
+        }
+    }
+
+    // Map Bet -> Bid for display in the existing ActiveBidsDialog
+    val activeDisplayBids = activeBets.map { bet ->
+        val game = BiddingDatabase.games.find { it.id == bet.gameId }
+        val eventTitle = game?.sport ?: "Game #${bet.gameId}"
+        val teamName = when (bet.pick) {
+            "home" -> game?.homeTeam ?: "Home"
+            "away" -> game?.awayTeam ?: "Away"
+            else -> "Unknown"
+        }
+        Bid(
+            eventId = bet.gameId,
+            eventTitle = eventTitle,
+            team = teamName,
+            amount = bet.stake,
+            odds = bet.odds
+        )
+    }
+
+
+    val activeBidsCount = activeDisplayBids.size
+
     var searchQuery by remember { mutableStateOf("") }
     var selectedSport by remember { mutableStateOf("All") }
     var showActiveBidsDialog by remember { mutableStateOf(false) }
@@ -178,8 +209,6 @@ fun HomeScreen(
     val userBids by BidsStore
         .bidsFlow(context, username)
         .collectAsState(initial = emptyList())
-
-    val activeBidsCount = userBids.size
 
     val sports = remember {
         listOf("All") + BiddingDatabase.games.map { it.sport }.distinct().sorted()
@@ -408,7 +437,7 @@ fun HomeScreen(
 
         if (showActiveBidsDialog) {
             ActiveBidsDialog(
-                bids = userBids,
+                bids = activeDisplayBids,
                 onDismiss = { showActiveBidsDialog = false }
             )
         }
@@ -486,16 +515,18 @@ fun BiddingScreen(
             onDismiss = { showBidDialog = false },
             onConfirm = { amount ->
                 if (amount <= balance) {
-                    val odds = if (selectedTeam == selectedEvent!!.team1)
-                        selectedEvent!!.odds1 else selectedEvent!!.odds2
+                    val event = selectedEvent!!
+                    val odds = if (selectedTeam == event.team1)
+                        event.odds1 else event.odds2
 
+                    // Persist bid history (for History tab)
                     scope.launch {
                         BidsStore.addBid(
                             context = context,
                             username = username,
                             bid = Bid(
-                                eventId = selectedEvent!!.id,
-                                eventTitle = selectedEvent!!.title,
+                                eventId = event.id,
+                                eventTitle = event.title,
                                 team = selectedTeam,
                                 amount = amount,
                                 odds = odds
@@ -503,6 +534,17 @@ fun BiddingScreen(
                         )
                     }
 
+                    // 🔹 Register active bet so it can be settled later
+                    val pick = if (selectedTeam == event.team1) "home" else "away"
+                    BiddingDatabase.placeBet(
+                        username = username,
+                        gameId = event.id,   // matches Game.id because of seeding/addGameAndEvent
+                        pick = pick,         // "home" or "away"
+                        stake = amount,
+                        odds = odds
+                    )
+
+                    // Update balance immediately (stake removed)
                     onBalanceChange(balance - amount)
                 }
                 showBidDialog = false

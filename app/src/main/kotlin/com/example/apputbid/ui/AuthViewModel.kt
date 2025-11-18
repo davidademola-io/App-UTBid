@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.apputbid.BuildConfig
 import com.example.apputbid.data.AuthRepository
+import com.example.apputbid.data.BalanceStore
 import com.example.apputbid.data.User
 import com.example.apputbid.data.UserDbHelper
 import com.example.apputbid.ui.main.BiddingDatabase
@@ -140,7 +141,7 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
     ) {
         viewModelScope.launch {
             try {
-                // 1) Persist result in SQLite
+                // 1) Persist result in SQLite (you already wired this)
                 repo.saveGameResult(
                     gameId = gameId,
                     home = homeScore,
@@ -148,12 +149,26 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
                     status = "completed"
                 )
 
-                // 2) Update in-memory games + resolve bets
-                BiddingDatabase.updateGameResult(
-                    gameId = gameId,
-                    homeScore = homeScore,
-                    awayScore = awayScore
-                )
+                // 2) Update in-memory games + resolve bets -> payouts
+                val payouts: List<BiddingDatabase.BetPayout> =
+                    BiddingDatabase.updateGameResult(
+                        gameId = gameId,
+                        homeScore = homeScore,
+                        awayScore = awayScore
+                    )
+
+                // 3) Apply payouts to each user's wallet
+                if (payouts.isNotEmpty()) {
+                    val ctx = getApplication<Application>().applicationContext
+
+                    // In case a user has multiple bets on the same game, sum them
+                    payouts
+                        .groupBy { it.username }
+                        .forEach { (username, userPayouts) ->
+                            val total = userPayouts.sumOf { it.amount }
+                            BalanceStore.adjustBalance(ctx, username, total)
+                        }
+                }
 
                 onDone(true, null)
             } catch (t: Throwable) {
@@ -162,6 +177,7 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
 
 
     fun addTeam(sport: String, teamName: String, onDone: (Boolean, String?) -> Unit = {_,_->}) {
