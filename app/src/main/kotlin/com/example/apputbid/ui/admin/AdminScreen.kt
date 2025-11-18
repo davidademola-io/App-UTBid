@@ -107,10 +107,7 @@ fun BannedUserScreen(onLogout: () -> Unit) {
 
 @Composable
 fun UsersSection(vm: AuthViewModel) {
-    var refreshTrigger by remember { mutableStateOf(0) }
-    val users = remember(refreshTrigger) {
-        BiddingDatabase.getAllUsers().filter { it.isNotBlank() && it != "admin" }
-    }
+    val users = BiddingDatabase.getAllUsers()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -118,25 +115,19 @@ fun UsersSection(vm: AuthViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "User Management",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF4169E1)
-                )
-                TextButton(onClick = { refreshTrigger++ }) { Text("Refresh") }
-            }
+            Text(
+                "User Management",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF4169E1),
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
         }
 
         if (users.isEmpty()) {
             item {
                 Text(
-                    "No users yet",
+                    "No users registered yet",
                     modifier = Modifier.padding(16.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -144,7 +135,17 @@ fun UsersSection(vm: AuthViewModel) {
         }
 
         items(users) { username ->
-            var isBanned by remember(refreshTrigger) { mutableStateOf(BiddingDatabase.isBanned(username)) }
+
+            // 🔑 Local state per user row
+            var isBanned by remember(username) {
+                mutableStateOf(BiddingDatabase.isBanned(username))
+            }
+
+            // 🔁 Side effect: whenever isBanned changes, persist it via ViewModel
+            LaunchedEffect(isBanned) {
+                // fire-and-forget; if it throws, UI still works
+                vm.setUserBanned(username, isBanned)
+            }
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -163,7 +164,11 @@ fun UsersSection(vm: AuthViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text(username, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            username,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                         if (isBanned) {
                             Text(
                                 "BANNED",
@@ -176,12 +181,22 @@ fun UsersSection(vm: AuthViewModel) {
 
                     Button(
                         onClick = {
-                            isBanned = !isBanned
-                            if (isBanned) BiddingDatabase.banUser(username) else BiddingDatabase.unbanUser(username)
-                            refreshTrigger++
+                            val newValue = !isBanned
+
+                            // ✅ Same behavior as the original working version:
+                            // update BiddingDatabase *and* local state.
+                            if (newValue) {
+                                BiddingDatabase.banUser(username)
+                            } else {
+                                BiddingDatabase.unbanUser(username)
+                            }
+                            isBanned = newValue
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isBanned) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error
+                            containerColor = if (isBanned)
+                                Color(0xFF4CAF50)  // green when banned → "Unban"
+                            else
+                                MaterialTheme.colorScheme.error // red when not banned → "Ban"
                         ),
                         shape = RoundedCornerShape(10.dp)
                     ) {
@@ -192,6 +207,8 @@ fun UsersSection(vm: AuthViewModel) {
         }
     }
 }
+
+
 
 
 

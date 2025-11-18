@@ -126,12 +126,17 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun setUserBanned(username: String, banned: Boolean, onDone: (Boolean, String?) -> Unit = { _, _ -> }) {
+    fun setUserBanned(
+        username: String,
+        banned: Boolean,
+        onDone: (Boolean, String?) -> Unit = { _, _ -> }
+    ) {
         viewModelScope.launch {
             try {
+                // write to SQLite
                 repo.setBanned(username, banned)
 
-                // keep in-memory cache in sync
+                // keep in-memory DB in sync for the rest of the app
                 if (banned) {
                     BiddingDatabase.banUser(username)
                 } else {
@@ -140,6 +145,7 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
 
                 onDone(true, null)
             } catch (t: Throwable) {
+                t.printStackTrace()
                 onDone(false, t.message)
             }
         }

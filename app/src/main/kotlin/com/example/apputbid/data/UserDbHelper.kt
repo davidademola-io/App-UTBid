@@ -7,7 +7,7 @@ import android.database.sqlite.SQLiteOpenHelper
 
  data class User(val id: Long, val username: String, val saltB64: String, val hashB64: String)
 class UserDbHelper private constructor(ctx: Context) :
-    SQLiteOpenHelper(ctx, "app.db", null, 1) {
+    SQLiteOpenHelper(ctx, "app.db", null, 2) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
