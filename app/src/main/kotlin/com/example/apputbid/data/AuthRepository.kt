@@ -64,4 +64,22 @@ class AuthRepository(private val db: UserDbHelper) {
             db.getAllBannedUsernames()
         }
 
+    data class GameResultOverride(
+        val gameId: Int,
+        val homeScore: Int,
+        val awayScore: Int,
+        val status: String
+    )
+
+    suspend fun saveGameResult(gameId: Int, home: Int, away: Int, status: String) =
+        withContext(Dispatchers.IO) {
+            db.setGameResult(gameId, home, away, status)
+        }
+
+    suspend fun getAllGameResults(): List<GameResultOverride> =
+        withContext(Dispatchers.IO) {
+            db.getAllGameResults()
+        }
+
+
 }

@@ -63,49 +63,6 @@ fun AdminLoginScreen(
 }
 
 @Composable
-fun BannedUserScreen(onLogout: () -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "Account Banned",
-                fontSize = 36.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            Text(
-                text = "Your account has been suspended by an administrator.",
-                fontSize = 16.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 32.dp)
-            )
-
-            Button(
-                onClick = onLogout,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF4169E1)
-                )
-            ) {
-                Text("Return to Login", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
-@Composable
 fun UsersSection(vm: AuthViewModel) {
     val users = BiddingDatabase.getAllUsers()
 
@@ -373,7 +330,7 @@ fun AddGameSection() {
 }
 
 @Composable
-fun SetResultsSection() {
+fun SetResultsSection(vm: AuthViewModel) {
     val upcomingGames = BiddingDatabase.games.filter { it.status == "upcoming" }
     var selectedGame by remember { mutableStateOf<Game?>(null) }
     var refreshTrigger by remember { mutableStateOf(0) }
@@ -439,16 +396,18 @@ fun SetResultsSection() {
     } else {
         SetGameResultScreen(
             game = selectedGame!!,
-            onBack = {
-                selectedGame = null
-                refreshTrigger++
+            vm = vm,
+            onBack = { selectedGame = null
+            refreshTrigger++
             }
         )
     }
 }
 
 @Composable
-fun SetGameResultScreen(game: Game, onBack: () -> Unit) {
+fun SetGameResultScreen(game: Game,
+                        vm: AuthViewModel,
+                        onBack: () -> Unit) {
     var homeScore by remember { mutableStateOf("") }
     var awayScore by remember { mutableStateOf("") }
 
@@ -527,8 +486,14 @@ fun SetGameResultScreen(game: Game, onBack: () -> Unit) {
                 val away = awayScore.toIntOrNull()
 
                 if (home != null && away != null) {
-                    BiddingDatabase.updateGameResult(game.id, home, away)
-                    onBack()
+                    vm.updateFinalScore(
+                        gameId = game.id,
+                        homeScore = home,
+                        awayScore = away
+                    ) { ok, err ->
+                        // optionally handle error; for now just go back
+                        onBack()
+                    }
                 }
             },
             modifier = Modifier
@@ -602,7 +567,7 @@ fun AdminDashboard(
             when (selectedSection) {
                 0 -> UsersSection(vm = vm)
                 1 -> AddGameSection()
-                2 -> SetResultsSection()
+                2 -> SetResultsSection(vm = vm)
             }
         }
     }

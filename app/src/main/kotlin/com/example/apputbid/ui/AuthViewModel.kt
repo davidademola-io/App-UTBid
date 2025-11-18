@@ -32,14 +32,19 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
                 val allUsernames = repo.getAllUsernames()
                 BiddingDatabase.seedUsers(allUsernames)
 
-                // NEW: load banned users from DB into in-memory cache
                 val banned = repo.getAllBannedUsernames()
                 BiddingDatabase.seedBanned(banned)
+
+                // NEW: load and apply any saved game results
+                val overrides = repo.getAllGameResults()
+                BiddingDatabase.applyResultOverrides(overrides)
+
             } catch (t: Throwable) {
                 t.printStackTrace()
             }
         }
     }
+
 
 
     // --- navigation helpers ---
@@ -127,16 +132,37 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
     }
 
 
-    fun updateFinalScore(gameId: Long, homeScore: Int, awayScore: Int, onDone: (Boolean, String?) -> Unit = {_,_->}) {
+    fun updateFinalScore(
+        gameId: Int,
+        homeScore: Int,
+        awayScore: Int,
+        onDone: (Boolean, String?) -> Unit = { _, _ -> }
+    ) {
         viewModelScope.launch {
             try {
-                // TODO: repo.updateFinalScore(gameId, homeScore, awayScore)
+                // 1) Persist result in SQLite
+                repo.saveGameResult(
+                    gameId = gameId,
+                    home = homeScore,
+                    away = awayScore,
+                    status = "completed"
+                )
+
+                // 2) Update in-memory games + resolve bets
+                BiddingDatabase.updateGameResult(
+                    gameId = gameId,
+                    homeScore = homeScore,
+                    awayScore = awayScore
+                )
+
                 onDone(true, null)
             } catch (t: Throwable) {
+                t.printStackTrace()
                 onDone(false, t.message)
             }
         }
     }
+
 
     fun addTeam(sport: String, teamName: String, onDone: (Boolean, String?) -> Unit = {_,_->}) {
         viewModelScope.launch {

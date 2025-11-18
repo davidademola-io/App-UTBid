@@ -1,5 +1,7 @@
 package com.example.apputbid.ui.main
 
+import com.example.apputbid.data.AuthRepository
+
 // ===== Models =====
 
 data class BiddingEvent(
@@ -90,10 +92,10 @@ object BiddingDatabase {
     val teams: List<Team> get() = _teams
 
     private val _games = mutableListOf(
-        Game(1, "Blue Ballers", "Kinfolk", 4, 1, "Today, 3:00 PM", "completed", "Men's Soccer"),
-        Game(2, "Oval Gladiators", "Heavy Flow", 2, 3, "Today, 6:30 PM", "completed", "Women's Soccer"),
+        Game(1, "Blue Ballers", "Kinfolk", 4, 1, "Today, 3:00 PM", "upcoming", "Men's Soccer"),
+        Game(2, "Oval Gladiators", "Heavy Flow", 2, 3, "Today, 6:30 PM", "upcoming", "Women's Soccer"),
         Game(3, "Calmation", "DDD FC", null, null, "Tomorrow, 4:00 PM", "upcoming", "Men's Soccer"),
-        Game(4, "Ball Handlers", "The SockHers", 3, 2, "Yesterday", "completed", "Women's Soccer"),
+        Game(4, "Ball Handlers", "The SockHers", 3, 2, "Yesterday", "upcoming", "Women's Soccer"),
     )
     val games: List<Game> get() = _games
 
@@ -268,6 +270,26 @@ object BiddingDatabase {
     fun seedBanned(usernames: List<String>) {
         bannedUsers.clear()
         bannedUsers.addAll(usernames)
+    }
+
+    fun applyResultOverrides(overrides: List<AuthRepository.GameResultOverride>) {
+        overrides.forEach { o ->
+            val idx = _games.indexOfFirst { it.id == o.gameId }
+            if (idx >= 0) {
+                val g = _games[idx]
+                _games[idx] = g.copy(
+                    homeScore = o.homeScore,
+                    awayScore = o.awayScore,
+                    status = o.status
+                )
+            }
+        }
+
+        data class BetPayout(
+            val username: String,
+            val amount: Double
+        )
+
     }
 
 }

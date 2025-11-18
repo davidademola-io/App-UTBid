@@ -7,7 +7,7 @@ import android.database.sqlite.SQLiteOpenHelper
 
  data class User(val id: Long, val username: String, val saltB64: String, val hashB64: String)
 class UserDbHelper private constructor(ctx: Context) :
-    SQLiteOpenHelper(ctx, "app.db", null, 2) {
+    SQLiteOpenHelper(ctx, "app.db", null, 3) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -23,11 +23,36 @@ class UserDbHelper private constructor(ctx: Context) :
             """.trimIndent()
         )
         db.execSQL("CREATE INDEX idx_users_username ON users(username);")
+
+        // NEW: store result overrides for seeded games
+        db.execSQL(
+            """
+        CREATE TABLE game_results(
+          game_id INTEGER PRIMARY KEY,
+          home_score INTEGER NOT NULL,
+          away_score INTEGER NOT NULL,
+          status TEXT NOT NULL
+        );
+        """.trimIndent()
+        )
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) {
             db.execSQL("ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0;")
+        }
+
+        if (oldVersion < 3) {
+            db.execSQL(
+                """
+            CREATE TABLE game_results(
+              game_id INTEGER PRIMARY KEY,
+              home_score INTEGER NOT NULL,
+              away_score INTEGER NOT NULL,
+              status TEXT NOT NULL
+            );
+            """.trimIndent()
+            )
         }
         // add future upgrades here
     }
@@ -148,6 +173,50 @@ class UserDbHelper private constructor(ctx: Context) :
         }
         return result
     }
+
+    fun setGameResult(gameId: Int, homeScore: Int, awayScore: Int, status: String) {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put("game_id", gameId)
+            put("home_score", homeScore)
+            put("away_score", awayScore)
+            put("status", status)
+        }
+        db.insertWithOnConflict(
+            "game_results",
+            null,
+            values,
+            SQLiteDatabase.CONFLICT_REPLACE
+        )
+    }
+
+    fun getAllGameResults(): List<AuthRepository.GameResultOverride> {
+        val db = readableDatabase
+        val results = mutableListOf<AuthRepository.GameResultOverride>()
+
+        val cursor = db.query(
+            "game_results",
+            arrayOf("game_id", "home_score", "away_score", "status"),
+            null,
+            null,
+            null,
+            null,
+            null
+        )
+
+        cursor.use {
+            while (it.moveToNext()) {
+                results += AuthRepository.GameResultOverride(
+                    gameId = it.getInt(0),
+                    homeScore = it.getInt(1),
+                    awayScore = it.getInt(2),
+                    status = it.getString(3)
+                )
+            }
+        }
+        return results
+    }
+
 
 
 }
