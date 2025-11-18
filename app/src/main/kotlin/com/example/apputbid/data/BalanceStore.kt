@@ -7,21 +7,30 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-// Top-level DataStore instance tied to Context
-val Context.dataStore by preferencesDataStore(name = "user_prefs")
+private val Context.balanceDataStore by preferencesDataStore("balances")
 
 object BalanceStore {
-    private val BALANCE_KEY = doublePreferencesKey("user_balance")
     const val DEFAULT_BALANCE = 1000.0
 
-    fun balanceFlow(context: Context): Flow<Double> =
-        context.dataStore.data.map { prefs ->
-            prefs[BALANCE_KEY] ?: DEFAULT_BALANCE
+    private fun keyFor(username: String) =
+        doublePreferencesKey("balance_$username")
+
+    fun balanceFlow(context: Context, username: String): Flow<Double> =
+        context.balanceDataStore.data.map { prefs ->
+            prefs[keyFor(username)] ?: DEFAULT_BALANCE
         }
 
-    suspend fun setBalance(context: Context, value: Double) {
-        context.dataStore.edit { prefs ->
-            prefs[BALANCE_KEY] = value
+    suspend fun setBalance(context: Context, username: String, value: Double) {
+        context.balanceDataStore.edit { prefs ->
+            prefs[keyFor(username)] = value
+        }
+    }
+
+    suspend fun adjustBalance(context: Context, username: String, delta: Double) {
+        context.balanceDataStore.edit { prefs ->
+            val key = keyFor(username)
+            val current = prefs[key] ?: DEFAULT_BALANCE
+            prefs[key] = current + delta
         }
     }
 }

@@ -1,5 +1,7 @@
 package com.example.apputbid.ui.main
 
+import com.example.apputbid.data.AuthRepository
+
 // ===== Models =====
 
 data class BiddingEvent(
@@ -90,10 +92,10 @@ object BiddingDatabase {
     val teams: List<Team> get() = _teams
 
     private val _games = mutableListOf(
-        Game(1, "Blue Ballers", "Kinfolk", 4, 1, "Today, 3:00 PM", "completed", "Men's Soccer"),
-        Game(2, "Oval Gladiators", "Heavy Flow", 2, 3, "Today, 6:30 PM", "completed", "Women's Soccer"),
+        Game(1, "Blue Ballers", "Kinfolk", 4, 1, "Today, 3:00 PM", "upcoming", "Men's Soccer"),
+        Game(2, "Oval Gladiators", "Heavy Flow", 2, 3, "Today, 6:30 PM", "upcoming", "Women's Soccer"),
         Game(3, "Calmation", "DDD FC", null, null, "Tomorrow, 4:00 PM", "upcoming", "Men's Soccer"),
-        Game(4, "Ball Handlers", "The SockHers", 3, 2, "Yesterday", "completed", "Women's Soccer"),
+        Game(4, "Ball Handlers", "The SockHers", 3, 2, "Yesterday", "upcoming", "Women's Soccer"),
     )
     val games: List<Game> get() = _games
 
@@ -218,9 +220,9 @@ object BiddingDatabase {
     }
 
     // ---- Set result + settle bets (called by SetGameResultScreen) ----
-    fun updateGameResult(gameId: Int, homeScore: Int, awayScore: Int) {
+    fun updateGameResult(gameId: Int, homeScore: Int, awayScore: Int): List<BetPayout> {
         val idx = _games.indexOfFirst { it.id == gameId }
-        if (idx < 0) return
+        if (idx < 0) return emptyList()
 
         val g = _games[idx]
         val finalGame = g.copy(
@@ -229,10 +231,13 @@ object BiddingDatabase {
             status = "completed"
         )
         _games[idx] = finalGame
-        resolveBetsForGame(finalGame)
+
+        // This will remove resolved bets and compute payouts
+        return resolveBetsForGame(finalGame)
     }
 
-    private fun resolveBetsForGame(game: Game) {
+
+    private fun resolveBetsForGame(game: Game): List<BetPayout> {
         val h = game.homeScore ?: 0
         val a = game.awayScore ?: 0
         val homeWon = h > a
@@ -240,34 +245,66 @@ object BiddingDatabase {
         val isTie = !homeWon && !awayWon
 
         val toResolve = activeBets.filter { it.gameId == game.id }.toList()
+        val payouts = mutableListOf<BetPayout>()
+
         toResolve.forEach { bet ->
-            when {
+            val payoutAmount = when {
                 isTie -> {
-                    // push: if you didn't escrow, refund stake now
-                    if (!ESCROW_STAKE) credit(bet.username, bet.stake)
-                    // if escrowed, just return stake by adding bet.stake
-                    if (ESCROW_STAKE) credit(bet.username, bet.stake)
-                    removeActiveBet(bet.id)
+                    // Push: refund stake
+                    bet.stake
                 }
                 homeWon && bet.pick == "home" || awayWon && bet.pick == "away" -> {
-                    // payout:
-                    // If you DID NOT escrow the stake, credit only PROFIT = stake*(odds-1)
-                    // If you DID escrow, credit full RETURN = stake*odds
-                    val payout = if (ESCROW_STAKE) bet.stake * bet.odds else bet.stake * (bet.odds - 1.0)
-                    credit(bet.username, payout)
-                    removeActiveBet(bet.id)
+                    // We already subtracted the stake when the user placed the bet,
+                    // so credit FULL RETURN = stake * odds
+                    bet.stake * bet.odds
                 }
                 else -> {
-                    // losing side: if escrowed, nothing (stake already deducted); if not escrowed, no debit.
-                    removeActiveBet(bet.id)
+                    // Losing side: stake was already removed, no extra change
+                    0.0
                 }
             }
+
+            if (payoutAmount > 0.0) {
+                payouts += BetPayout(
+                    username = bet.username,
+                    amount = payoutAmount
+                )
+            }
+
+            // In all cases, bet is no longer active after result
+            removeActiveBet(bet.id)
         }
+
+        return payouts
     }
+
 
     fun seedBanned(usernames: List<String>) {
         bannedUsers.clear()
         bannedUsers.addAll(usernames)
     }
+
+    fun applyResultOverrides(overrides: List<AuthRepository.GameResultOverride>) {
+        overrides.forEach { o ->
+            val idx = _games.indexOfFirst { it.id == o.gameId }
+            if (idx >= 0) {
+                val g = _games[idx]
+                _games[idx] = g.copy(
+                    homeScore = o.homeScore,
+                    awayScore = o.awayScore,
+                    status = o.status
+                )
+            }
+        }
+    }
+
+    data class BetPayout(
+        val username: String,
+        val amount: Double
+    )
+
+    fun getActiveBetsForUser(username: String): List<Bet> =
+        activeBets.filter { it.username == username }
+
 
 }

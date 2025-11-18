@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.apputbid.BuildConfig
 import com.example.apputbid.data.AuthRepository
+import com.example.apputbid.data.BalanceStore
 import com.example.apputbid.data.User
 import com.example.apputbid.data.UserDbHelper
 import com.example.apputbid.ui.main.BiddingDatabase
@@ -32,14 +33,19 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
                 val allUsernames = repo.getAllUsernames()
                 BiddingDatabase.seedUsers(allUsernames)
 
-                // NEW: load banned users from DB into in-memory cache
                 val banned = repo.getAllBannedUsernames()
                 BiddingDatabase.seedBanned(banned)
+
+                // NEW: load and apply any saved game results
+                val overrides = repo.getAllGameResults()
+                BiddingDatabase.applyResultOverrides(overrides)
+
             } catch (t: Throwable) {
                 t.printStackTrace()
             }
         }
     }
+
 
 
     // --- navigation helpers ---
@@ -127,16 +133,52 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
     }
 
 
-    fun updateFinalScore(gameId: Long, homeScore: Int, awayScore: Int, onDone: (Boolean, String?) -> Unit = {_,_->}) {
+    fun updateFinalScore(
+        gameId: Int,
+        homeScore: Int,
+        awayScore: Int,
+        onDone: (Boolean, String?) -> Unit = { _, _ -> }
+    ) {
         viewModelScope.launch {
             try {
-                // TODO: repo.updateFinalScore(gameId, homeScore, awayScore)
+                // 1) Persist result in SQLite (you already wired this)
+                repo.saveGameResult(
+                    gameId = gameId,
+                    home = homeScore,
+                    away = awayScore,
+                    status = "completed"
+                )
+
+                // 2) Update in-memory games + resolve bets -> payouts
+                val payouts: List<BiddingDatabase.BetPayout> =
+                    BiddingDatabase.updateGameResult(
+                        gameId = gameId,
+                        homeScore = homeScore,
+                        awayScore = awayScore
+                    )
+
+                // 3) Apply payouts to each user's wallet
+                if (payouts.isNotEmpty()) {
+                    val ctx = getApplication<Application>().applicationContext
+
+                    // In case a user has multiple bets on the same game, sum them
+                    payouts
+                        .groupBy { it.username }
+                        .forEach { (username, userPayouts) ->
+                            val total = userPayouts.sumOf { it.amount }
+                            BalanceStore.adjustBalance(ctx, username, total)
+                        }
+                }
+
                 onDone(true, null)
             } catch (t: Throwable) {
+                t.printStackTrace()
                 onDone(false, t.message)
             }
         }
     }
+
+
 
     fun addTeam(sport: String, teamName: String, onDone: (Boolean, String?) -> Unit = {_,_->}) {
         viewModelScope.launch {

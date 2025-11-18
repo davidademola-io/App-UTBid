@@ -3,6 +3,7 @@ package com.example.apputbid.data
 import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
 import com.example.apputbid.ui.main.Bid
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -12,11 +13,14 @@ import kotlinx.coroutines.flow.map
 object BidsStore {
     private val gson = Gson()
 
+    private val Context.bidsDataStore by preferencesDataStore("bids")
+
+
     private fun keyForUser(username: String) =
         stringPreferencesKey("bids_$username")
 
     fun bidsFlow(context: Context, username: String): Flow<List<Bid>> =
-        context.dataStore.data.map { prefs ->
+        context.bidsDataStore.data.map { prefs ->
             val key = keyForUser(username)
             val json = prefs[key] ?: return@map emptyList<Bid>()
 
@@ -25,7 +29,7 @@ object BidsStore {
         }
 
     suspend fun addBid(context: Context, username: String, bid: Bid) {
-        context.dataStore.edit { prefs ->
+        context.bidsDataStore.edit { prefs ->
             val key = keyForUser(username)
             val currentJson = prefs[key]
             val type = object : TypeToken<MutableList<Bid>>() {}.type
