@@ -133,4 +133,32 @@ class AuthRepository(private val db: UserDbHelper) {
         val winRate: Double
     )
 
+    data class BetHistoryEntry(
+        val id: Long,
+        val gameId: Int,
+        val pick: String,        // "home" or "away"
+        val stake: Double,
+        val odds: Double,
+        val result: String,      // "PENDING", "WIN", "LOSS", "PUSH"
+        val payout: Double,
+        val timestamp: Long
+    )
+
+    suspend fun getBetHistory(username: String): List<BetHistoryEntry> =
+        withContext(Dispatchers.IO) {
+            db.getBetHistory(username)
+        }
+
+    suspend fun updateBetHistoryResult(
+        username: String,
+        gameId: Int,
+        pick: String,
+        result: String,
+        payout: Double
+    ) = withContext(Dispatchers.IO) {
+        db.updateBetHistoryResult(username, gameId, pick, result, payout)
+    }
+
+
+
 }

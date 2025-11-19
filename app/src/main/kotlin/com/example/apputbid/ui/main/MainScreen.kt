@@ -186,6 +186,7 @@ fun MainScreen(
                         username = username,
                         balance = balance,
                         onBalanceChange = updateBalance,
+                        authRepository = authRepository,
                         modifier = Modifier.padding(paddingValues)
                     )
                     2 -> WalletScreen(
@@ -196,8 +197,10 @@ fun MainScreen(
                     )
                     3 -> HistoryScreen(
                         username = username,
+                        authRepository = authRepository,
                         modifier = Modifier.padding(paddingValues)
                     )
+
                 }
             }
         }
@@ -535,8 +538,10 @@ fun BiddingScreen(
     username: String,
     balance: Double,
     onBalanceChange: (Double) -> Unit,
+    authRepository: AuthRepository,
     modifier: Modifier = Modifier
-) {
+)
+{
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -620,6 +625,7 @@ fun BiddingScreen(
 
                     // Persist bid history (for History tab)
                     scope.launch {
+                        // Persist bid for legacy/history (DataStore)
                         BidsStore.addBid(
                             context = context,
                             username = username,
@@ -631,7 +637,19 @@ fun BiddingScreen(
                                 odds = odds
                             )
                         )
+
+                        // 🔹 NEW: insert PENDING row into bet_history
+                        authRepository.insertBetHistory(
+                            username = username,
+                            gameId = event.id,
+                            pick = if (selectedTeam == event.team1) "home" else "away",
+                            stake = amount,
+                            odds = odds,
+                            result = "PENDING",
+                            payout = 0.0
+                        )
                     }
+
 
                     // Register active bet so it can be settled later
                     val pick = if (selectedTeam == event.team1) "home" else "away"
@@ -659,15 +677,17 @@ fun BiddingScreen(
 @Composable
 fun HistoryScreen(
     username: String,
+    authRepository: AuthRepository,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    val bids by BidsStore
-        .bidsFlow(context, username)
-        .collectAsState(initial = emptyList())
+    var bets by remember { mutableStateOf<List<AuthRepository.BetHistoryEntry>>(emptyList()) }
+
+    LaunchedEffect(username) {
+        bets = authRepository.getBetHistory(username)
+    }
 
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        if (bids.isEmpty()) {
+        if (bets.isEmpty()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -676,14 +696,14 @@ fun HistoryScreen(
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = "No bids yet",
+                    text = "No bets yet",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Place a bid to see your history here.",
+                    text = "Place a bet to see your history here.",
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
@@ -696,11 +716,14 @@ fun HistoryScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(bids) { bid -> HistoryBidCard(bid = bid) }
+                items(bets) { entry ->
+                    BetHistoryCard(entry)
+                }
             }
         }
     }
 }
+
 
 /* =========================
    CARDS + DIALOGS
@@ -869,9 +892,42 @@ fun HistoryBidCard(
     bid: Bid,
     modifier: Modifier = Modifier
 ) {
+    // Look up the related game from the in-memory DB
+    val game = BiddingDatabase.games.find { it.id == bid.eventId }
+
+    val (statusText, statusColor) = if (
+        game == null ||
+        game.status.lowercase() != "completed" ||
+        game.homeScore == null ||
+        game.awayScore == null
+    ) {
+        // Game not finished or unknown
+        "Pending" to MaterialTheme.colorScheme.onSurfaceVariant
+    } else {
+        val homeScore = game.homeScore!!
+        val awayScore = game.awayScore!!
+        val isHomeBet = bid.team == game.homeTeam
+        val isAwayBet = bid.team == game.awayTeam
+
+        when {
+            homeScore == awayScore -> {
+                "Push" to MaterialTheme.colorScheme.tertiary
+            }
+            (isHomeBet && homeScore > awayScore) ||
+                    (isAwayBet && awayScore > homeScore) -> {
+                "Won" to MaterialTheme.colorScheme.primary
+            }
+            else -> {
+                "Lost" to MaterialTheme.colorScheme.error
+            }
+        }
+    }
+
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
@@ -892,14 +948,109 @@ fun HistoryBidCard(
             )
             Text("Odds: ${bid.odds}x")
             Spacer(Modifier.height(4.dp))
+
+            // Potential win (still useful)
             Text(
                 text = "Potential win: $${"%.2f".format(bid.amount * bid.odds)}",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.primary
             )
+
+            Spacer(Modifier.height(6.dp))
+
+            // 🔹 NEW: status line
+            Text(
+                text = "Status: $statusText",
+                fontWeight = FontWeight.SemiBold,
+                color = statusColor
+            )
         }
     }
 }
+
+@Composable
+fun BetHistoryCard(
+    entry: AuthRepository.BetHistoryEntry,
+    modifier: Modifier = Modifier
+) {
+    val game = BiddingDatabase.games.find { it.id == entry.gameId }
+
+    val eventTitle = game?.sport ?: "Game #${entry.gameId}"
+    val teamName = when (entry.pick) {
+        "home" -> game?.homeTeam ?: "Home"
+        "away" -> game?.awayTeam ?: "Away"
+        else -> "Unknown"
+    }
+
+    val statusText = when (entry.result.uppercase()) {
+        "WIN" -> "Won"
+        "LOSS" -> "Lost"
+        "PUSH" -> "Push"
+        "PENDING" -> "Pending"
+        else -> entry.result
+    }
+
+    val statusColor = when (entry.result.uppercase()) {
+        "WIN" -> MaterialTheme.colorScheme.primary
+        "LOSS" -> MaterialTheme.colorScheme.error
+        "PUSH" -> MaterialTheme.colorScheme.tertiary
+        "PENDING" -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    val net = when (entry.result.uppercase()) {
+        "WIN" -> entry.payout - entry.stake
+        "LOSS" -> -entry.stake
+        "PUSH" -> 0.0
+        else -> 0.0
+    }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            //Text(eventTitle, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Team: $teamName",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Stake: $${"%.2f".format(entry.stake)}",
+                fontWeight = FontWeight.Medium
+            )
+            Text("Odds: ${entry.odds}x")
+            Spacer(Modifier.height(4.dp))
+
+            Text(
+                text = "Status: $statusText",
+                fontWeight = FontWeight.SemiBold,
+                color = statusColor
+            )
+
+            if (entry.result.uppercase() != "PENDING") {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Net: ${if (net >= 0) "+" else ""}$${"%.2f".format(net)}",
+                    fontWeight = FontWeight.Medium,
+                    color = if (net >= 0) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}
+
+
 
 @Composable
 fun StatCard(

@@ -313,4 +313,68 @@ class UserDbHelper private constructor(ctx: Context) :
                 INSTANCE ?: UserDbHelper(ctx.applicationContext).also { INSTANCE = it }
             }
     }
+
+    fun getBetHistory(username: String): List<AuthRepository.BetHistoryEntry> {
+        val db = readableDatabase
+        val result = mutableListOf<AuthRepository.BetHistoryEntry>()
+
+        val cursor = db.query(
+            "bet_history",
+            arrayOf(
+                "id",
+                "game_id",
+                "pick",
+                "stake",
+                "odds",
+                "result",
+                "payout",
+                "timestamp"
+            ),
+            "username = ?",
+            arrayOf(username),
+            null,
+            null,
+            "timestamp DESC"
+        )
+
+        cursor.use {
+            while (it.moveToNext()) {
+                result += AuthRepository.BetHistoryEntry(
+                    id = it.getLong(0),
+                    gameId = it.getInt(1),
+                    pick = it.getString(2),
+                    stake = it.getDouble(3),
+                    odds = it.getDouble(4),
+                    result = it.getString(5),
+                    payout = it.getDouble(6),
+                    timestamp = it.getLong(7)
+                )
+            }
+        }
+        return result
+    }
+
+    fun updateBetHistoryResult(
+        username: String,
+        gameId: Int,
+        pick: String,
+        result: String,
+        payout: Double
+    ) {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put("result", result)
+            put("payout", payout)
+        }
+
+        // We mark *all* pending bets for this user + game + pick as resolved.
+        db.update(
+            "bet_history",
+            values,
+            "username = ? AND game_id = ? AND pick = ? AND result = 'PENDING'",
+            arrayOf(username, gameId.toString(), pick)
+        )
+    }
+
+
 }

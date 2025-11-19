@@ -177,23 +177,21 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
 
                     // 4) 🔹 NEW: persist each bet result into bet_history table
                     payouts.forEach { p ->
-                        // Map enum to string "WIN" / "LOSS" / "PUSH"
                         val resultString = when (p.result) {
                             BiddingDatabase.BetResult.WIN -> "WIN"
                             BiddingDatabase.BetResult.LOSS -> "LOSS"
                             BiddingDatabase.BetResult.PUSH -> "PUSH"
                         }
 
-                        repo.insertBetHistory(
+                        repo.updateBetHistoryResult(
                             username = p.username,
                             gameId = p.gameId,
                             pick = p.pick,
-                            stake = p.stake,
-                            odds = p.odds,
                             result = resultString,
                             payout = p.amount
                         )
                     }
+
                 }
 
                 onDone(true, null)
