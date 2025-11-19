@@ -17,6 +17,10 @@ class AuthRepository(private val db: UserDbHelper) {
             if (username.isBlank() || password.isEmpty())
                 return@withContext Result.failure(IllegalArgumentException("Username and password required"))
 
+            if(!username.endsWith("@mavs.uta.edu")){
+                return@withContext Result.failure(IllegalArgumentException("Must be a UTA email"))
+            }
+
             if (db.usernameExists(username)) {
                 java.util.Arrays.fill(password, '\u0000')
                 return@withContext Result.failure(IllegalStateException("Username already exists"))

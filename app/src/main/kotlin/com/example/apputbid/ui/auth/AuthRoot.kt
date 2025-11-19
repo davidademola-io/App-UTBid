@@ -16,12 +16,15 @@ import com.example.apputbid.ui.admin.AdminLoginScreen
 import com.example.apputbid.ui.main.MainScreen
 
 @Composable
-fun UniBiddingApp(vm: AuthViewModel) {
+fun UniBiddingApp(
+    vm: AuthViewModel,
+    isDarkTheme: Boolean,
+    onToggleTheme: () -> Unit
+) {
     val state by vm.state.collectAsState()
 
     when (state.route) {
         is Route.Login -> {
-            // normal user login screen
             LoginScreen(vm = vm)
         }
 
@@ -39,10 +42,11 @@ fun UniBiddingApp(vm: AuthViewModel) {
             if (user != null) {
                 MainScreen(
                     username = user.username,
+                    isDarkTheme = isDarkTheme,
+                    onToggleTheme = onToggleTheme,
                     onLogout = { vm.logout() }
                 )
             } else {
-                // fall back to login if something is weird
                 LoginScreen(vm = vm)
             }
         }
@@ -50,16 +54,22 @@ fun UniBiddingApp(vm: AuthViewModel) {
         is Route.Admin -> {
             AdminDashboard(
                 vm = vm,
+                isDarkTheme = isDarkTheme,
+                onToggleTheme = onToggleTheme,
                 onLogout = { vm.logout() }
             )
         }
-
     }
 }
 
 
+
+
+
 @Composable
-fun LoginScreen(vm: AuthViewModel) {
+fun LoginScreen(
+    vm: AuthViewModel
+) {
     val state by vm.state.collectAsState()
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }

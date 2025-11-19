@@ -510,10 +510,12 @@ fun SetGameResultScreen(game: Game,
 }
  @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    fun AdminDashboard(
-        vm: AuthViewModel,
-        onLogout: () -> Unit
-    ) {
+ fun AdminDashboard(
+     vm: AuthViewModel,
+     isDarkTheme: Boolean,
+     onToggleTheme: () -> Unit,
+     onLogout: () -> Unit
+ ) {
         var selectedSection by remember { mutableStateOf(0) }
         var showAccountSheet by remember { mutableStateOf(false) }
 
