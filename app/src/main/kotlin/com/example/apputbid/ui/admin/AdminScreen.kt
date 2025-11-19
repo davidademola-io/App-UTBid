@@ -508,69 +508,85 @@ fun SetGameResultScreen(game: Game,
         }
     }
 }
+ @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    fun AdminDashboard(
+        vm: AuthViewModel,
+        onLogout: () -> Unit
+    ) {
+        var selectedSection by remember { mutableStateOf(0) }
+        var showAccountSheet by remember { mutableStateOf(false) }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AdminDashboard(
-    vm: AuthViewModel,
-    onLogout: () -> Unit) {
-    var selectedSection by remember { mutableStateOf(0) }
-    var showAccountSheet by remember { mutableStateOf(false) }
+     Scaffold(
+         topBar = {
+             Surface(
+                 modifier = Modifier.fillMaxWidth(),
+                 color = Color(0xFF4169E1),
+                 tonalElevation = 4.dp
+             ) {
+                 Row(
+                     modifier = Modifier
+                         .fillMaxWidth()
+                         .padding(horizontal = 16.dp, vertical = 12.dp),
+                     horizontalArrangement = Arrangement.SpaceBetween,
+                     verticalAlignment = Alignment.CenterVertically
+                 ) {
+                     Text(
+                         "Admin Dashboard",
+                         fontSize = 24.sp,
+                         fontWeight = FontWeight.Bold,
+                         color = Color.White
+                     )
 
-    Scaffold(
-        topBar = {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = Color(0xFF4169E1),
-                tonalElevation = 4.dp
+                     // 🔹 THIS is the admin Logout button
+                     TextButton(onClick = onLogout) {
+                         Text(
+                             text = "Logout",
+                             color = Color.White,
+                             fontWeight = FontWeight.Bold
+                         )
+                     }
+                 }
+             }
+         }
+         // ...
+     )
+     { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                ScrollableTabRow(
+                    selectedTabIndex = selectedSection,
+                    modifier = Modifier.fillMaxWidth(),
+                    containerColor = MaterialTheme.colorScheme.background,
+                    contentColor = Color(0xFF4169E1)
                 ) {
-                    Text(
-                        "Admin Dashboard",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
+                    Tab(
+                        selected = selectedSection == 0,
+                        onClick = { selectedSection = 0 },
+                        text = { Text("Users") }
                     )
-                    IconButton(onClick = { showAccountSheet = true }) {
-                        Surface(shape = RoundedCornerShape(50), color = Color.White.copy(alpha = 0.2f)) {
-                            Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
-                                Text("A", color = Color.White, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
+                    Tab(
+                        selected = selectedSection == 1,
+                        onClick = { selectedSection = 1 },
+                        text = { Text("Add Game") }
+                    )
+                    Tab(
+                        selected = selectedSection == 2,
+                        onClick = { selectedSection = 2 },
+                        text = { Text("Set Results") }
+                    )
+                }
+
+                when (selectedSection) {
+                    0 -> UsersSection(vm = vm)
+                    1 -> AddGameSection()
+                    2 -> SetResultsSection(vm = vm)
                 }
             }
         }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            ScrollableTabRow(
-                selectedTabIndex = selectedSection,
-                modifier = Modifier.fillMaxWidth(),
-                containerColor = MaterialTheme.colorScheme.background,
-                contentColor = Color(0xFF4169E1)
-            ) {
-                Tab(selected = selectedSection == 0, onClick = { selectedSection = 0 }, text = { Text("Users") })
-                Tab(selected = selectedSection == 1, onClick = { selectedSection = 1 }, text = { Text("Add Game") })
-                Tab(selected = selectedSection == 2, onClick = { selectedSection = 2 }, text = { Text("Set Results") })
-            }
-
-            when (selectedSection) {
-                0 -> UsersSection(vm = vm)
-                1 -> AddGameSection()
-                2 -> SetResultsSection(vm = vm)
-            }
-        }
-    }
 
     if (showAccountSheet) {
         ModalBottomSheet(

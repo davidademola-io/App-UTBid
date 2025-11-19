@@ -20,6 +20,52 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.apputbid.ui.theme.UniBiddingTheme
 
+/* ===========
+   TOP BANNER
+   =========== */
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsTopBar(
+    onBack: () -> Unit
+) {
+    TopAppBar(
+        title = {
+            Text(
+                "Settings",
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color.White
+                )
+            }
+        },
+        actions = {
+            Icon(
+                imageVector = Icons.Default.Settings,
+                contentDescription = "Settings Icon",
+                tint = Color.White,
+                modifier = Modifier.padding(end = 12.dp)
+            )
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = Color(0xFF4169E1) // Royal blue
+        )
+    )
+}
+
+
+/* ==================
+   SETTINGS SCREEN
+   ================== */
+
 @Composable
 fun SettingsScreen(
     username: String,
@@ -38,53 +84,8 @@ fun SettingsScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Top Bar
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = Color(0xFF4169E1),  // Royal blue color
-                tonalElevation = 4.dp
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
-                                tint = Color.White
-                            )
-                        }
-                        Column {
-                            Text(
-                                text = "Settings",
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = "Manage your preferences",
-                                fontSize = 14.sp,
-                                color = Color.White.copy(alpha = 0.8f)
-                            )
-                        }
-                    }
-
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-            }
+            // 🔹 New banner at the top
+            SettingsTopBar(onBack = onBack)
 
             // Settings Content
             LazyColumn(
@@ -368,6 +369,10 @@ fun SettingsScreen(
     }
 }
 
+/* ==================
+   SUPPORTING COMPOSABLES
+   ================== */
+
 @Composable
 fun SettingsItem(
     icon: ImageVector,
@@ -512,6 +517,10 @@ fun PasswordChangeDialog(
         }
     )
 }
+
+/* ==================
+   PREVIEWS
+   ================== */
 
 @Preview(showBackground = true)
 @Composable

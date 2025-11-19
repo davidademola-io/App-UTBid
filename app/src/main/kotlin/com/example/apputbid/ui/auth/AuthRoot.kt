@@ -20,29 +20,43 @@ fun UniBiddingApp(vm: AuthViewModel) {
     val state by vm.state.collectAsState()
 
     when (state.route) {
-        is Route.Login -> LoginScreen(vm = vm)
+        is Route.Login -> {
+            // normal user login screen
+            LoginScreen(vm = vm)
+        }
 
-        is Route.AdminLogin -> AdminLoginScreen(
-            onBack = { vm.backToLogin() },
-            onAdminAuthed = { pass -> vm.adminLogin(pass) } // uses BuildConfig.ADMIN_PASSCODE
-        )
+        is Route.AdminLogin -> {
+            AdminLoginScreen(
+                onBack = { vm.backToLogin() },
+                onAdminAuthed = { passcode ->
+                    vm.adminLogin(passcode)
+                }
+            )
+        }
 
-        is Route.Main -> MainScreen(
-            username = state.currentUser?.username.orEmpty(),
-            onLogout = { vm.logout() }
-        )
+        is Route.Main -> {
+            val user = state.currentUser
+            if (user != null) {
+                MainScreen(
+                    username = user.username,
+                    onLogout = { vm.logout() }
+                )
+            } else {
+                // fall back to login if something is weird
+                LoginScreen(vm = vm)
+            }
+        }
 
-        is Route.Admin -> AdminDashboard(
-            vm = vm,
-            onLogout = { vm.logout() }
-        )
+        is Route.Admin -> {
+            AdminDashboard(
+                vm = vm,
+                onLogout = { vm.logout() }
+            )
+        }
 
-        Route.Admin -> TODO()
-        Route.AdminLogin -> TODO()
-        Route.Login -> TODO()
-        Route.Main -> TODO()
     }
 }
+
 
 @Composable
 fun LoginScreen(vm: AuthViewModel) {

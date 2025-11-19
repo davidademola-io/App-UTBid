@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
@@ -29,12 +30,13 @@ import com.example.apputbid.data.BidsStore
 import com.example.apputbid.ui.main.BiddingDatabase
 import com.example.apputbid.ui.main.Game
 import com.example.apputbid.ui.main.BiddingEvent
+import com.example.apputbid.ui.settings.SettingsScreen
+import com.example.apputbid.ui.wallet.WalletScreen
 
 /* =========================
    MAIN SCREEN + NAV BAR
    ========================= */
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     username: String,
@@ -43,123 +45,158 @@ fun MainScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // Persisted balance
+    // ✅ Per-user balance (unchanged logic – just make sure this matches your latest)
     val balance by BalanceStore
         .balanceFlow(context, username)
         .collectAsState(initial = BalanceStore.DEFAULT_BALANCE)
 
-
-
     var selectedTab by remember { mutableStateOf(0) }
-    var showAccountSheet by remember { mutableStateOf(false) }
 
     val updateBalance: (Double) -> Unit = { newBalance ->
-        scope.launch { BalanceStore.setBalance(context, username, newBalance) }
-    }
-
-
-    Scaffold(
-        bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp
-            ) {
-                NavigationBarItem(
-                    icon = {
-                        Icon(
-                            if (selectedTab == 0) Icons.Filled.Home else Icons.Outlined.Home,
-                            contentDescription = "Home"
-                        )
-                    },
-                    label = { Text("Home") },
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                    )
-                )
-                NavigationBarItem(
-                    icon = {
-                        Icon(
-                            if (selectedTab == 1) Icons.Filled.List else Icons.Outlined.List,
-                            contentDescription = "Bidding"
-                        )
-                    },
-                    label = { Text("Bidding") },
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                    )
-                )
-                NavigationBarItem(
-                    icon = { Icon(Icons.Filled.History, contentDescription = "History") },
-                    label = { Text("History") },
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                    )
-                )
-            }
-        }
-    ) { paddingValues ->
-        when (selectedTab) {
-            0 -> HomeScreen(
-                username = username,
-                balance = balance,
-                modifier = Modifier.padding(paddingValues),
-                onProfileClick = { showAccountSheet = true }   // NEW: open slide menu
-            )
-            1 -> BiddingScreen(
-                username = username,
-                balance = balance,
-                onBalanceChange = updateBalance,
-                modifier = Modifier.padding(paddingValues)
-            )
-            2 -> HistoryScreen(
-                username = username,
-                modifier = Modifier.padding(paddingValues)
-            )
+        scope.launch {
+            BalanceStore.setBalance(context, username, newBalance)
         }
     }
 
-    // Sliding account menu (bottom sheet) with Logout
-    if (showAccountSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showAccountSheet = false },
-            dragHandle = { BottomSheetDefaults.DragHandle() }
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text("Account", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Text("Logged in as $username")
+    // Drawer + theme
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    var isDarkTheme by remember { mutableStateOf(false) }
 
-                Spacer(Modifier.height(8.dp))
+    // Stub player stats for now
+    val playerStats = remember { PlayerStats(wins = 0, losses = 0) }
 
-                ListItem(
-                    headlineContent = { Text("Logout") },
-                    modifier = Modifier.clickable {
-                        showAccountSheet = false
-                        onLogout()
+    // 🔹 New: are we in Settings screen?
+    var showSettings by remember { mutableStateOf(false) }
+
+    ProfileDrawer(
+        drawerState = drawerState,
+        username = username,
+        playerStats = playerStats,
+        isDarkTheme = isDarkTheme,
+        onToggleTheme = { isDarkTheme = !isDarkTheme },
+        onLogout = onLogout,
+        onNavigateToSettings = {
+            scope.launch { drawerState.close() }
+            showSettings = true
+        }
+    ) {
+        if (showSettings) {
+            // 🔹 Full-screen SettingsScreen
+            SettingsScreen(
+                username = username,
+                isDarkTheme = isDarkTheme,
+                onToggleTheme = { isDarkTheme = !isDarkTheme },
+                onBack = { showSettings = false },
+                onLogout = onLogout
+            )
+        } else {
+            // 🔹 Normal tabbed main UI
+            Scaffold(
+                bottomBar = {
+                    NavigationBar(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 8.dp
+                    ) {
+                        // 0 – Home
+                        NavigationBarItem(
+                            icon = {
+                                Icon(
+                                    if (selectedTab == 0) Icons.Filled.Home else Icons.Outlined.Home,
+                                    contentDescription = "Home"
+                                )
+                            },
+                            label = { Text("Home") },
+                            selected = selectedTab == 0,
+                            onClick = { selectedTab = 0 },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                            )
+                        )
+
+                        // 1 – Bidding
+                        NavigationBarItem(
+                            icon = {
+                                Icon(
+                                    if (selectedTab == 1) Icons.Filled.List else Icons.Outlined.List,
+                                    contentDescription = "Bidding"
+                                )
+                            },
+                            label = { Text("Bidding") },
+                            selected = selectedTab == 1,
+                            onClick = { selectedTab = 1 },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                            )
+                        )
+
+                        // 2 – Wallet
+                        NavigationBarItem(
+                            icon = {
+                                Icon(
+                                    Icons.Filled.AccountBalanceWallet,
+                                    contentDescription = "Wallet"
+                                )
+                            },
+                            label = { Text("Wallet") },
+                            selected = selectedTab == 2,
+                            onClick = { selectedTab = 2 },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                            )
+                        )
+
+                        // 3 – History
+                        NavigationBarItem(
+                            icon = { Icon(Icons.Filled.History, contentDescription = "History") },
+                            label = { Text("History") },
+                            selected = selectedTab == 3,
+                            onClick = { selectedTab = 3 },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                            )
+                        )
                     }
-                )
-
-                Spacer(Modifier.height(8.dp))
+                }
+            ) { paddingValues ->
+                when (selectedTab) {
+                    0 -> HomeScreen(
+                        username = username,
+                        balance = balance,
+                        modifier = Modifier.padding(paddingValues),
+                        onProfileClick = {
+                            scope.launch { drawerState.open() }
+                        }
+                    )
+                    1 -> BiddingScreen(
+                        username = username,
+                        balance = balance,
+                        onBalanceChange = updateBalance,
+                        modifier = Modifier.padding(paddingValues)
+                    )
+                    2 -> WalletScreen(
+                        username = username,
+                        balance = balance,
+                        onBalanceChange = updateBalance,
+                        modifier = Modifier.padding(paddingValues)
+                    )
+                    3 -> HistoryScreen(
+                        username = username,
+                        modifier = Modifier.padding(paddingValues)
+                    )
+                }
             }
         }
     }
 }
+
 
 /* =========================
    HOME SCREEN + STATS
@@ -170,18 +207,20 @@ fun HomeScreen(
     username: String,
     balance: Double,
     modifier: Modifier = Modifier,
-    onProfileClick: () -> Unit   // NEW: callback from MainScreen
+    onProfileClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
-    // Only bets that are still active (game not resolved yet)
-    val activeBets by remember(username) {
-        derivedStateOf {
-            BiddingDatabase.getActiveBetsForUser(username)
-        }
-    }
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedSport by remember { mutableStateOf("All") }
+    var showActiveBidsDialog by remember { mutableStateOf(false) }
 
-    // Map Bet -> Bid for display in the existing ActiveBidsDialog
+    val userBids by BidsStore
+        .bidsFlow(context, username)
+        .collectAsState(initial = emptyList())
+
+    // Only open bets
+    val activeBets = BiddingDatabase.getActiveBetsForUser(username)
     val activeDisplayBids = activeBets.map { bet ->
         val game = BiddingDatabase.games.find { it.id == bet.gameId }
         val eventTitle = game?.sport ?: "Game #${bet.gameId}"
@@ -198,17 +237,7 @@ fun HomeScreen(
             odds = bet.odds
         )
     }
-
-
     val activeBidsCount = activeDisplayBids.size
-
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedSport by remember { mutableStateOf("All") }
-    var showActiveBidsDialog by remember { mutableStateOf(false) }
-
-    val userBids by BidsStore
-        .bidsFlow(context, username)
-        .collectAsState(initial = emptyList())
 
     val sports = remember {
         listOf("All") + BiddingDatabase.games.map { it.sport }.distinct().sorted()
@@ -271,10 +300,11 @@ fun HomeScreen(
                             contentDescription = "User Profile",
                             modifier = Modifier
                                 .size(40.dp)
-                                .clickable { onProfileClick() },  // NEW: opens sheet
+                                .clickable { onProfileClick() },
                             tint = MaterialTheme.colorScheme.onSecondary
                         )
                     }
+
                 }
             }
 
@@ -319,11 +349,11 @@ fun HomeScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            "Current Balance",
+                            text = "Current Balance",
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                         Text(
-                            "$${"%.2f".format(balance)}",
+                            text = "$${"%.2f".format(balance)}",
                             fontSize = 36.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
@@ -428,7 +458,9 @@ fun HomeScreen(
                         )
                     }
                 } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                         items(filteredGames) { game -> GameCard(game) }
                     }
                 }
@@ -488,20 +520,37 @@ fun BiddingScreen(
                 }
             }
 
+            // Only show events for games that are still "upcoming"
+            val upcomingEvents = BiddingDatabase.events.filter { event ->
+                val game = BiddingDatabase.games.find { it.id == event.id }
+                game?.status == "upcoming"
+            }
+
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(BiddingDatabase.events) { event ->
-                    EventCard(
-                        event = event,
-                        onBidClick = { team ->
-                            selectedEvent = event
-                            selectedTeam = team
-                            showBidDialog = true
-                        }
-                    )
+                if (upcomingEvents.isEmpty()) {
+                    item {
+                        Text(
+                            text = "No upcoming events available for bidding.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
+                } else {
+                    items(upcomingEvents) { event ->
+                        EventCard(
+                            event = event,
+                            onBidClick = { team ->
+                                selectedEvent = event
+                                selectedTeam = team
+                                showBidDialog = true
+                            }
+                        )
+                    }
                 }
             }
         }

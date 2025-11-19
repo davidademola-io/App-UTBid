@@ -2,40 +2,34 @@ package com.example.apputbid.ui.wallet
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.font.FontWeight
-import com.example.apputbid.ui.main.BiddingDatabase
 
 @Composable
 fun WalletScreen(
     username: String,
-    onBack: () -> Unit
+    balance: Double,
+    onBalanceChange: (Double) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var amount by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var showDepositSheet by remember { mutableStateOf(false) }
-    var refresh by remember { mutableStateOf(0) }
-
-    val balance = remember(username, refresh) {
-        BiddingDatabase.getBalance(username)
-    }
 
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Top Bar matching main app style
+            // Top Bar (no back arrow – this is a tab)
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = Color(0xFF4169E1),  // Royal blue color
@@ -48,30 +42,18 @@ fun WalletScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
-                                tint = Color.White
-                            )
-                        }
-                        Column {
-                            Text(
-                                text = "Wallet",
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = "Manage your funds",
-                                fontSize = 14.sp,
-                                color = Color.White.copy(alpha = 0.8f)
-                            )
-                        }
+                    Column {
+                        Text(
+                            text = "Wallet",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "Manage your funds",
+                            fontSize = 14.sp,
+                            color = Color.White.copy(alpha = 0.8f)
+                        )
                     }
 
                     Text(
@@ -92,7 +74,7 @@ fun WalletScreen(
             ) {
                 Spacer(Modifier.height(24.dp))
 
-                // Balance Card matching home screen style
+                // Balance Card
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -184,7 +166,7 @@ fun WalletScreen(
                         )
                     }
 
-                    // Withdraw button (optional – uses BiddingDatabase.withdraw)
+                    // Withdraw button
                     Button(
                         modifier = Modifier
                             .weight(1f)
@@ -199,10 +181,9 @@ fun WalletScreen(
                                     error = "Insufficient balance"
                                 }
                                 else -> {
-                                    BiddingDatabase.withdraw(username, amt)
+                                    onBalanceChange(balance - amt)
                                     amount = ""
                                     error = null
-                                    refresh++
                                 }
                             }
                         },
@@ -257,10 +238,9 @@ fun WalletScreen(
             amount = amount.toDoubleOrNull() ?: 0.0,
             onSelect = {
                 val amt = amount.toDoubleOrNull() ?: 0.0
-                BiddingDatabase.addFunds(username, amt)
+                onBalanceChange(balance + amt)
                 amount = ""
                 showDepositSheet = false
-                refresh++
             },
             onCancel = { showDepositSheet = false }
         )
