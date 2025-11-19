@@ -5,11 +5,16 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
- data class User(val id: Long, val username: String, val saltB64: String, val hashB64: String)
+data class User(val id: Long, val username: String, val saltB64: String, val hashB64: String)
+
 class UserDbHelper private constructor(ctx: Context) :
-    SQLiteOpenHelper(ctx, "app.db", null, 3) {
+    SQLiteOpenHelper(ctx, "app.db", null, 4) {   // ⬅️ Bumped DB version to 4
 
     override fun onCreate(db: SQLiteDatabase) {
+
+        // ------------------
+        // USERS TABLE
+        // ------------------
         db.execSQL(
             """
             CREATE TABLE users(
@@ -24,27 +29,11 @@ class UserDbHelper private constructor(ctx: Context) :
         )
         db.execSQL("CREATE INDEX idx_users_username ON users(username);")
 
-        // NEW: store result overrides for seeded games
+        // ------------------
+        // GAME RESULTS TABLE
+        // ------------------
         db.execSQL(
             """
-        CREATE TABLE game_results(
-          game_id INTEGER PRIMARY KEY,
-          home_score INTEGER NOT NULL,
-          away_score INTEGER NOT NULL,
-          status TEXT NOT NULL
-        );
-        """.trimIndent()
-        )
-    }
-
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion < 2) {
-            db.execSQL("ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0;")
-        }
-
-        if (oldVersion < 3) {
-            db.execSQL(
-                """
             CREATE TABLE game_results(
               game_id INTEGER PRIMARY KEY,
               home_score INTEGER NOT NULL,
@@ -52,10 +41,72 @@ class UserDbHelper private constructor(ctx: Context) :
               status TEXT NOT NULL
             );
             """.trimIndent()
+        )
+
+        // ------------------
+        // NEW: BET HISTORY TABLE
+        // ------------------
+        db.execSQL(
+            """
+            CREATE TABLE bet_history(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              username TEXT NOT NULL,
+              game_id INTEGER NOT NULL,
+              pick TEXT NOT NULL,      -- "home" / "away"
+              stake REAL NOT NULL,
+              odds REAL NOT NULL,
+              result TEXT NOT NULL,    -- "WIN" / "LOSS" / "PUSH"
+              payout REAL NOT NULL,    -- amount credited (0, stake, or stake*odds)
+              timestamp INTEGER NOT NULL
+            );
+            """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX idx_bet_history_username ON bet_history(username);")
+    }
+
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0;")
+        }
+
+        if (oldVersion < 3) {
+            db.execSQL(
+                """
+                CREATE TABLE game_results(
+                  game_id INTEGER PRIMARY KEY,
+                  home_score INTEGER NOT NULL,
+                  away_score INTEGER NOT NULL,
+                  status TEXT NOT NULL
+                );
+                """.trimIndent()
             )
         }
-        // add future upgrades here
+
+        // NEW: Add bet_history table on upgrade to version 4
+        if (oldVersion < 4) {
+            db.execSQL(
+                """
+                CREATE TABLE bet_history(
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  username TEXT NOT NULL,
+                  game_id INTEGER NOT NULL,
+                  pick TEXT NOT NULL,
+                  stake REAL NOT NULL,
+                  odds REAL NOT NULL,
+                  result TEXT NOT NULL,
+                  payout REAL NOT NULL,
+                  timestamp INTEGER NOT NULL
+                );
+                """.trimIndent()
+            )
+            db.execSQL("CREATE INDEX idx_bet_history_username ON bet_history(username);")
+        }
     }
+
+    // ====================================================
+    // USER OPERATIONS
+    // ====================================================
 
     fun insertUser(username: String, saltB64: String, hashB64: String): Long {
         val cv = ContentValues().apply {
@@ -88,101 +139,59 @@ class UserDbHelper private constructor(ctx: Context) :
         }
     }
 
-    companion object {
-        @Volatile private var INSTANCE: UserDbHelper? = null
-        fun get(ctx: Context): UserDbHelper =
-            INSTANCE ?: synchronized(this) {
-                INSTANCE ?: UserDbHelper(ctx.applicationContext).also { INSTANCE = it }
-            }
-    }
-
     fun getAllUsernames(): List<String> {
         val db = readableDatabase
-        val usernames = mutableListOf<String>()
+        val list = mutableListOf<String>()
 
-        // Adjust "users" and "username" if your table/column names differ
-        val cursor = db.query(
-            "users",                    // table name
-            arrayOf("username"),        // columns
-            null,                       // selection
-            null,                       // selectionArgs
-            null,                       // groupBy
-            null,                       // having
-            null                        // orderBy
-        )
-
+        val cursor = db.query("users", arrayOf("username"), null, null, null, null, null)
         cursor.use {
-            while (it.moveToNext()) {
-                usernames.add(it.getString(0))
-            }
+            while (it.moveToNext()) list.add(it.getString(0))
         }
-
-        return usernames
+        return list
     }
 
     fun setUserBanned(username: String, banned: Boolean) {
-        val db = writableDatabase
         val values = ContentValues().apply {
             put("banned", if (banned) 1 else 0)
         }
-        db.update(
-            "users",
-            values,
-            "username = ?",
-            arrayOf(username)
-        )
+        writableDatabase.update("users", values, "username=?", arrayOf(username))
     }
 
     fun isUserBanned(username: String): Boolean {
-        val db = readableDatabase
-        val cursor = db.query(
-            "users",
-            arrayOf("banned"),
-            "username = ?",
-            arrayOf(username),
-            null,
-            null,
-            null
+        val cursor = readableDatabase.query(
+            "users", arrayOf("banned"), "username=?",
+            arrayOf(username), null, null, null
         )
         cursor.use {
-            if (it.moveToFirst()) {
-                return it.getInt(0) == 1
-            }
+            if (it.moveToFirst()) return it.getInt(0) == 1
         }
         return false
     }
 
     fun getAllBannedUsernames(): List<String> {
-        val db = readableDatabase
         val result = mutableListOf<String>()
-
-        val cursor = db.query(
-            "users",
-            arrayOf("username"),
-            "banned = 1",
-            null,
-            null,
-            null,
-            null
+        val cursor = readableDatabase.query(
+            "users", arrayOf("username"), "banned=1",
+            null, null, null, null
         )
-
         cursor.use {
-            while (it.moveToNext()) {
-                result.add(it.getString(0))
-            }
+            while (it.moveToNext()) result.add(it.getString(0))
         }
         return result
     }
 
+    // ====================================================
+    // GAME RESULT OPERATIONS
+    // ====================================================
+
     fun setGameResult(gameId: Int, homeScore: Int, awayScore: Int, status: String) {
-        val db = writableDatabase
         val values = ContentValues().apply {
             put("game_id", gameId)
             put("home_score", homeScore)
             put("away_score", awayScore)
             put("status", status)
         }
-        db.insertWithOnConflict(
+        writableDatabase.insertWithOnConflict(
             "game_results",
             null,
             values,
@@ -191,22 +200,15 @@ class UserDbHelper private constructor(ctx: Context) :
     }
 
     fun getAllGameResults(): List<AuthRepository.GameResultOverride> {
-        val db = readableDatabase
-        val results = mutableListOf<AuthRepository.GameResultOverride>()
-
-        val cursor = db.query(
+        val list = mutableListOf<AuthRepository.GameResultOverride>()
+        val cursor = readableDatabase.query(
             "game_results",
             arrayOf("game_id", "home_score", "away_score", "status"),
-            null,
-            null,
-            null,
-            null,
-            null
+            null, null, null, null, null
         )
-
         cursor.use {
             while (it.moveToNext()) {
-                results += AuthRepository.GameResultOverride(
+                list += AuthRepository.GameResultOverride(
                     gameId = it.getInt(0),
                     homeScore = it.getInt(1),
                     awayScore = it.getInt(2),
@@ -214,9 +216,101 @@ class UserDbHelper private constructor(ctx: Context) :
                 )
             }
         }
-        return results
+        return list
+    }
+
+    // ====================================================
+    // NEW: BET HISTORY TABLE OPERATIONS
+    // ====================================================
+
+    fun insertBetHistory(
+        username: String,
+        gameId: Int,
+        pick: String,
+        stake: Double,
+        odds: Double,
+        result: String,   // "WIN", "LOSS", "PUSH"
+        payout: Double
+    ) {
+        val cv = ContentValues().apply {
+            put("username", username)
+            put("game_id", gameId)
+            put("pick", pick)
+            put("stake", stake)
+            put("odds", odds)
+            put("result", result)
+            put("payout", payout)
+            put("timestamp", System.currentTimeMillis())
+        }
+        writableDatabase.insert("bet_history", null, cv)
+    }
+
+    fun getTotalWon(username: String): Double {
+        val sql =
+            """
+            SELECT COALESCE(
+                SUM(
+                    CASE 
+                       WHEN result='WIN'  THEN payout - stake
+                       WHEN result='LOSS' THEN -stake
+                       ELSE 0
+                    END
+                ),
+                0
+            )
+            FROM bet_history
+            WHERE username=?
+            """
+
+        readableDatabase.rawQuery(sql, arrayOf(username)).use { c ->
+            return if (c.moveToFirst()) c.getDouble(0) else 0.0
+        }
+    }
+
+    fun getUserBetStats(username: String): AuthRepository.UserBetStats {
+        val sql =
+            """
+        SELECT
+          SUM(CASE WHEN result = 'WIN'  THEN 1 ELSE 0 END) AS wins,
+          SUM(CASE WHEN result = 'LOSS' THEN 1 ELSE 0 END) AS losses,
+          COUNT(*) AS total
+        FROM bet_history
+        WHERE username = ?
+        """
+
+        readableDatabase.rawQuery(sql, arrayOf(username)).use { c ->
+            if (c.moveToFirst()) {
+                val wins = c.getInt(0)
+                val losses = c.getInt(1)
+                val total = c.getInt(2)
+                val winRate = if (total > 0) (wins.toDouble() / total) * 100.0 else 0.0
+
+                return AuthRepository.UserBetStats(
+                    wins = wins,
+                    losses = losses,
+                    totalGames = total,
+                    winRate = winRate
+                )
+            }
+        }
+
+        // No bets yet → all zeros
+        return AuthRepository.UserBetStats(
+            wins = 0,
+            losses = 0,
+            totalGames = 0,
+            winRate = 0.0
+        )
     }
 
 
+    // ====================================================
 
+    companion object {
+        @Volatile private var INSTANCE: UserDbHelper? = null
+        fun get(ctx: Context): UserDbHelper =
+            INSTANCE ?: synchronized(this) {
+                INSTANCE ?: UserDbHelper(ctx.applicationContext).also { INSTANCE = it }
+            }
+    }
 }

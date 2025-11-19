@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -27,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import com.example.apputbid.data.BalanceStore
 import com.example.apputbid.data.BidsStore
+import com.example.apputbid.data.AuthRepository
 import com.example.apputbid.ui.settings.SettingsScreen
 import com.example.apputbid.ui.wallet.WalletScreen
 
@@ -39,7 +41,8 @@ fun MainScreen(
     username: String,
     onLogout: () -> Unit,
     isDarkTheme: Boolean,
-    onToggleTheme: () -> Unit
+    onToggleTheme: () -> Unit,
+    authRepository: AuthRepository
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -59,15 +62,24 @@ fun MainScreen(
 
     // Drawer + settings
     val drawerState = rememberDrawerState(DrawerValue.Closed)
-    val playerStats = remember { PlayerStats(wins = 0, losses = 0) }
+    var playerStats by remember { mutableStateOf(PlayerStats(wins = 0, losses = 0)) }
+
+    LaunchedEffect(username) {
+        // Load stats from SQLite via AuthRepository
+        val stats = authRepository.getUserBetStats(username)
+        playerStats = PlayerStats(
+            wins = stats.wins,
+            losses = stats.losses
+        )
+    }
     var showSettings by remember { mutableStateOf(false) }
 
     ProfileDrawer(
         drawerState = drawerState,
         username = username,
         playerStats = playerStats,
-        isDarkTheme = isDarkTheme,          // ✅ use global theme value
-        onToggleTheme = onToggleTheme,      // ✅ call global toggle callback
+        isDarkTheme = isDarkTheme,
+        onToggleTheme = onToggleTheme,
         onLogout = onLogout,
         onNavigateToSettings = {
             scope.launch { drawerState.close() }
@@ -78,8 +90,8 @@ fun MainScreen(
             // 🔹 Full-screen SettingsScreen
             SettingsScreen(
                 username = username,
-                isDarkTheme = isDarkTheme,      // ✅ same global value
-                onToggleTheme = onToggleTheme,  // ✅ same global toggle
+                isDarkTheme = isDarkTheme,
+                onToggleTheme = onToggleTheme,
                 onBack = { showSettings = false },
                 onLogout = onLogout
             )
@@ -164,6 +176,7 @@ fun MainScreen(
                     0 -> HomeScreen(
                         username = username,
                         balance = balance,
+                        authRepository = authRepository,
                         modifier = Modifier.padding(paddingValues),
                         onProfileClick = {
                             scope.launch { drawerState.open() }
@@ -200,6 +213,7 @@ fun MainScreen(
 fun HomeScreen(
     username: String,
     balance: Double,
+    authRepository: AuthRepository,
     modifier: Modifier = Modifier,
     onProfileClick: () -> Unit = {}
 ) {
@@ -233,6 +247,12 @@ fun HomeScreen(
     }
     val activeBidsCount = activeDisplayBids.size
 
+    // 🔹 Total Won from SQLite via AuthRepository
+    var totalWon by remember { mutableStateOf(0.0) }
+    LaunchedEffect(username) {
+        totalWon = authRepository.getTotalWon(username)
+    }
+
     val sports = remember {
         listOf("All") + BiddingDatabase.games.map { it.sport }.distinct().sorted()
     }
@@ -253,7 +273,8 @@ fun HomeScreen(
 
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
-            // Top bar
+
+            /* ===== Top bar (with small balance that never scrolls away) ===== */
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.secondary,
@@ -278,6 +299,13 @@ fun HomeScreen(
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSecondary
                         )
+                        // Always-visible compact balance line
+                        Text(
+                            text = "Balance: $${"%.2f".format(balance)}",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSecondary
+                        )
                     }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -298,11 +326,10 @@ fun HomeScreen(
                             tint = MaterialTheme.colorScheme.onSecondary
                         )
                     }
-
                 }
             }
 
-            // Search
+            // Search (fixed above scrolling content)
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -319,143 +346,172 @@ fun HomeScreen(
                 )
             )
 
-            // Main content
-            Column(
+            // Everything below scrolls together
+            LazyColumn(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Balance card
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
+
+                // Big balance card
+                item {
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .padding(bottom = 4.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                     ) {
-                        Text(
-                            text = "Current Balance",
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                        Text(
-                            text = "$${"%.2f".format(balance)}",
-                            fontSize = 36.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "Current Balance",
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Text(
+                                text = "$${"%.2f".format(balance)}",
+                                fontSize = 36.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
                     }
                 }
 
-                Text(
-                    text = "Quick Stats",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    StatCard(
-                        title = "Active Bids",
-                        value = activeBidsCount.toString(),
-                        modifier = Modifier.weight(1f),
-                        onClick = { if (activeBidsCount > 0) showActiveBidsDialog = true }
-                    )
-                    StatCard(
-                        title = "Total Won",
-                        value = "$0.00",
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                // Sport filter tabs
-                ScrollableTabRow(
-                    selectedTabIndex = sports.indexOf(selectedSport),
-                    containerColor = MaterialTheme.colorScheme.background,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    edgePadding = 0.dp,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    sports.forEach { sport ->
-                        Tab(
-                            selected = selectedSport == sport,
-                            onClick = { selectedSport = sport },
-                            text = {
-                                Text(
-                                    text = sport,
-                                    fontWeight = if (selectedSport == sport) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                // List header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                // Quick Stats
+                item {
                     Text(
-                        text =
-                            if (searchQuery.isBlank() && selectedSport == "All") "Recent & Upcoming Games"
-                            else "Search Results",
+                        text = "Quick Stats",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
-                    if (searchQuery.isNotBlank() || selectedSport != "All") {
-                        Text(
-                            text = "${filteredGames.size} found",
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        StatCard(
+                            title = "Active Bids",
+                            value = activeBidsCount.toString(),
+                            modifier = Modifier.weight(1f),
+                            onClick = { if (activeBidsCount > 0) showActiveBidsDialog = true }
+                        )
+
+                        // 🔹 Color logic for Total Won card
+                        val (bgColor, txtColor) = when {
+                            totalWon > 0.0 -> Pair(
+                                Color(0xFF4CAF50),   // Green
+                                Color.White
+                            )
+                            totalWon < 0.0 -> Pair(
+                                Color(0xFFF44336),   // Red
+                                Color.White
+                            )
+                            else -> Pair(
+                                MaterialTheme.colorScheme.surfaceVariant,   // Neutral
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        StatCard(
+                            title = "Total Won",
+                            value = "$${"%.2f".format(totalWon)}",
+                            modifier = Modifier.weight(1f),
+                            backgroundColor = bgColor,
+                            contentColor = txtColor
                         )
                     }
                 }
 
-                if (filteredGames.isEmpty()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                // Sport filter tabs
+                item {
+                    Spacer(Modifier.height(8.dp))
+                    ScrollableTabRow(
+                        selectedTabIndex = sports.indexOf(selectedSport),
+                        containerColor = MaterialTheme.colorScheme.background,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        edgePadding = 0.dp,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        sports.forEach { sport ->
+                            Tab(
+                                selected = selectedSport == sport,
+                                onClick = { selectedSport = sport },
+                                text = {
+                                    Text(
+                                        text = sport,
+                                        fontWeight = if (selectedSport == sport) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // List header
+                item {
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "No games found",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text =
+                                if (searchQuery.isBlank() && selectedSport == "All") "Recent & Upcoming Games"
+                                else "Search Results",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.padding(vertical = 8.dp)
                         )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = "Try searching for a different team or sport",
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
+                        if (searchQuery.isNotBlank() || selectedSport != "All") {
+                            Text(
+                                text = "${filteredGames.size} found",
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // Games or empty state
+                if (filteredGames.isEmpty()) {
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "No games found",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = "Try searching for a different team or sport",
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 } else {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(filteredGames) { game -> GameCard(game) }
+                    items(filteredGames) { game ->
+                        GameCard(game)
                     }
                 }
             }
@@ -577,12 +633,12 @@ fun BiddingScreen(
                         )
                     }
 
-                    // 🔹 Register active bet so it can be settled later
+                    // Register active bet so it can be settled later
                     val pick = if (selectedTeam == event.team1) "home" else "away"
                     BiddingDatabase.placeBet(
                         username = username,
-                        gameId = event.id,   // matches Game.id because of seeding/addGameAndEvent
-                        pick = pick,         // "home" or "away"
+                        gameId = event.id,
+                        pick = pick,
                         stake = amount,
                         odds = odds
                     )
@@ -850,7 +906,9 @@ fun StatCard(
     title: String,
     value: String,
     modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
+    backgroundColor: Color? = null,
+    contentColor: Color? = null
 ) {
     val cardModifier = if (onClick != null) {
         modifier.clickable(onClick = onClick)
@@ -858,10 +916,14 @@ fun StatCard(
         modifier
     }
 
+    val containerColor = backgroundColor ?: MaterialTheme.colorScheme.surfaceVariant
+    val textColor = contentColor ?: MaterialTheme.colorScheme.onSurfaceVariant
+
     Card(
         modifier = cardModifier,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = containerColor,
+            contentColor = textColor
         )
     ) {
         Column(
@@ -873,13 +935,13 @@ fun StatCard(
             Text(
                 text = title,
                 fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = textColor
             )
             Text(
                 text = value,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = textColor
             )
         }
     }

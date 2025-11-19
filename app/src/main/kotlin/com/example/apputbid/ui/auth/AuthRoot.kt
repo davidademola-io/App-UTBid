@@ -1,5 +1,7 @@
 package com.example.apputbid.ui.auth
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,6 +17,7 @@ import com.example.apputbid.ui.admin.AdminDashboard
 import com.example.apputbid.ui.admin.AdminLoginScreen
 import com.example.apputbid.ui.main.MainScreen
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun UniBiddingApp(
     vm: AuthViewModel,
@@ -45,7 +48,8 @@ fun UniBiddingApp(
                     username = user.username,
                     isDarkTheme = isDarkTheme,
                     onToggleTheme = onToggleTheme,
-                    onLogout = { vm.logout() }
+                    onLogout = { vm.logout() },
+                    authRepository = vm.authRepository   // 👈 REQUIRED
                 )
             } else {
                 LoginScreen(vm = vm)
