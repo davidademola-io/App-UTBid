@@ -74,28 +74,28 @@ object BiddingDatabase {
     private val _events = mutableListOf(
         BiddingEvent(1, "Men's Soccer", "Blue Ballers", "Kinfolk", 1.8, 2.1, "Sports"),
         BiddingEvent(2, "Men's Soccer", "Calmation", "DDD FC", 1.5, 2.5, "Sports"),
-        BiddingEvent(3, "Women's Soccer", "Oval Gladiators", "Heavy Flow", 1.9, 1.9, "Sports"),
-        BiddingEvent(4, "Women's Soccer", "Ball Handlers", "The SockHers", 2.0, 1.7, "Sports"),
+        BiddingEvent(3, "Women's Soccer", "Purple Thunder", "The Procrastinators", 1.9, 1.9, "Sports"),
+        BiddingEvent(4, "Women's Soccer", "Touch Grass FC", "Honey Badgers", 2.0, 1.7, "Sports"),
     )
     val events: List<BiddingEvent> get() = _events
 
     private val _teams = listOf(
         Team("Blue Ballers", 12, 3, "Men's Soccer"),
         Team("Kinfolk", 10, 5, "Men's Soccer"),
-        Team("Calmation", 7, 8, "Men's Soccer"),
+        Team("Purple Thunder", 8, 7, "Women's Soccer"),
+        Team("The Procrastinators", 11, 4, "Women's Soccer"),
         Team("DDD FC", 9, 6, "Men's Soccer"),
-        Team("Oval Gladiators", 8, 7, "Women's Soccer"),
-        Team("Heavy Flow", 11, 4, "Women's Soccer"),
-        Team("Ball Handlers", 13, 2, "Women's Soccer"),
-        Team("The SockHers", 6, 9, "Women's Soccer")
+        Team("Calmation", 7, 8, "Men's Soccer"),
+        Team("Touch Grass FC", 13, 2, "Women's Soccer"),
+        Team("Honey Badgers", 6, 9, "Women's Soccer")
     )
     val teams: List<Team> get() = _teams
 
     private val _games = mutableListOf(
-        Game(1, "Blue Ballers", "Kinfolk", 4, 1, "Today, 3:00 PM", "upcoming", "Men's Soccer"),
-        Game(2, "Oval Gladiators", "Heavy Flow", 2, 3, "Today, 6:30 PM", "upcoming", "Women's Soccer"),
+        Game(1, "Blue Ballers", "Kinfolk", null, null, "Today, 3:00 PM", "upcoming", "Men's Soccer"),
+        Game(2, "Purple Thunder", "The Procrastinators", null, null, "Today, 6:30 PM", "upcoming", "Women's Soccer"),
         Game(3, "Calmation", "DDD FC", null, null, "Tomorrow, 4:00 PM", "upcoming", "Men's Soccer"),
-        Game(4, "Ball Handlers", "The SockHers", 3, 2, "Yesterday", "upcoming", "Women's Soccer"),
+        Game(4, "Touch Grass FC", "Honey Badgers", null, null, "Tomorrow, 7:00 PM", "upcoming", "Women's Soccer"),
     )
     val games: List<Game> get() = _games
 
