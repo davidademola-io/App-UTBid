@@ -1,6 +1,8 @@
 package com.example.apputbid.ui.main
 
-// One place for all the bidding-related models
+import com.example.apputbid.data.AuthRepository
+
+// ===== Models =====
 
 data class BiddingEvent(
     val id: Int,
@@ -19,7 +21,7 @@ data class Game(
     val homeScore: Int?,
     val awayScore: Int?,
     val date: String,
-    val status: String,
+    val status: String,   // "upcoming" | "completed" (or "final")
     val sport: String
 )
 
@@ -38,54 +40,332 @@ data class Bid(
     val odds: Double
 )
 
+/** Active/open bet placed by a user (resolved when the game completes). */
+data class Bet(
+    val id: Long,
+    val username: String,
+    val gameId: Int,      // align with Game.id (was Long before)
+    val pick: String,     // "home" or "away"
+    val stake: Double,    // amount wagered
+    val odds: Double      // decimal odds (e.g., 1.8)
+)
+
+
+// ===== In-memory DB used by UI/Admin =====
+
 object BiddingDatabase {
 
-    val events = listOf(
+    // --- constants ---
+    private const val DEFAULT_START_BALANCE = 20.0
+    private const val ESCROW_STAKE = false // set true if you debit stake at placeBet
+
+    // ---- Users & moderation ----
+    private val registeredUsers = linkedSetOf<String>()     // filled via ensureUser/seedUsers
+    private val bannedUsers = mutableSetOf<String>()
+
+    // ---- Balances ----
+    private val balances = mutableMapOf<String, Double>()   // username -> balance
+
+    // ---- Bets (active/open) ----
+    private val activeBets = mutableListOf<Bet>()
+    private var betSeq = 1L
+
+
+    data class BetHistory(
+        val betId: Long,
+        val username: String,
+        val gameId: Int,
+        val pick: String,
+        val stake: Double,
+        val odds: Double,
+        val result: BetResult,
+        val payout: Double    // 0, stake, or stake * odds
+    )
+
+    private val betHistory = mutableListOf<BetHistory>()
+
+    // ---- Seeds ----
+    private val _events = mutableListOf(
         BiddingEvent(1, "Men's Soccer", "Blue Ballers", "Kinfolk", 1.8, 2.1, "Sports"),
         BiddingEvent(2, "Men's Soccer", "Calmation", "DDD FC", 1.5, 2.5, "Sports"),
-        BiddingEvent(3, "Women's Soccer", "Oval Gladiators", "Heavy Flow", 1.9, 1.9, "Sports"),
-        BiddingEvent(4, "Women's Soccer", "Ball Handlers", "The SockHers", 2.0, 1.7, "Sports"),
+        BiddingEvent(3, "Women's Soccer", "Purple Thunder", "The Procrastinators", 1.9, 1.9, "Sports"),
+        BiddingEvent(4, "Women's Soccer", "Touch Grass FC", "Honey Badgers", 2.0, 1.7, "Sports"),
     )
+    val events: List<BiddingEvent> get() = _events
 
-    val teams = listOf(
+    private val _teams = listOf(
         Team("Blue Ballers", 12, 3, "Men's Soccer"),
         Team("Kinfolk", 10, 5, "Men's Soccer"),
-        Team("Calmation", 7, 8, "Men's Soccer"),
+        Team("Purple Thunder", 8, 7, "Women's Soccer"),
+        Team("The Procrastinators", 11, 4, "Women's Soccer"),
         Team("DDD FC", 9, 6, "Men's Soccer"),
-        Team("Oval Gladiators", 8, 7, "Women's Soccer"),
-        Team("Heavy Flow", 11, 4, "Women's Soccer"),
-        Team("Ball Handlers", 13, 2, "Women's Soccer"),
-        Team("The SockHers", 6, 9, "Women's Soccer")
+        Team("Calmation", 7, 8, "Men's Soccer"),
+        Team("Touch Grass FC", 13, 2, "Women's Soccer"),
+        Team("Honey Badgers", 6, 9, "Women's Soccer")
     )
+    val teams: List<Team> get() = _teams
 
-    val games = listOf(
-        Game(1, "Blue Ballers", "Kinfolk", 4, 1, "Today, 3:00 PM", "completed", "Men's Soccer"),
-        Game(2, "Oval Gladiators", "Heavy Flow", 2, 3, "Today, 6:30 PM", "completed", "Women's Soccer"),
+    private val _games = mutableListOf(
+        Game(1, "Blue Ballers", "Kinfolk", null, null, "Today, 3:00 PM", "upcoming", "Men's Soccer"),
+        Game(2, "Purple Thunder", "The Procrastinators", null, null, "Today, 6:30 PM", "upcoming", "Women's Soccer"),
         Game(3, "Calmation", "DDD FC", null, null, "Tomorrow, 4:00 PM", "upcoming", "Men's Soccer"),
-        Game(4, "Ball Handlers", "The SockHers", 3, 2, "Yesterday", "completed", "Women's Soccer"),
+        Game(4, "Touch Grass FC", "Honey Badgers", null, null, "Tomorrow, 7:00 PM", "upcoming", "Women's Soccer"),
+    )
+    val games: List<Game> get() = _games
+
+
+    fun ensureUser(username: String) {
+        if (username.isBlank()) return
+        registeredUsers += username
+        // initialize wallet only once
+        balances.putIfAbsent(username, DEFAULT_START_BALANCE)
+    }
+
+    /** Seed multiple users at once (useful if you ever preload from DB). */
+    fun seedUsers(usernames: List<String>) {
+        usernames.forEach { ensureUser(it) }
+    }
+
+    fun getAllUsers(): List<String> =
+        (registeredUsers + balances.keys + activeBets.map { it.username })
+            .filter { it.isNotBlank() && it != "admin" }
+            .distinct()
+            .sorted()
+
+    fun isBanned(username: String): Boolean = username in bannedUsers
+
+    fun banUser(username: String) {
+        bannedUsers += username
+    }
+
+    fun unbanUser(username: String) {
+        bannedUsers -= username
+    }
+
+    fun addFunds(username: String, amount: Double) {
+        if (amount <= 0.0) return
+        ensureUser(username)
+        balances[username] = getBalance(username) + amount
+    }
+
+    fun getBalance(username: String): Double = balances[username] ?: 0.0
+
+    private fun credit(username: String, amount: Double) = addFunds(username, amount)
+
+    private fun debit(username: String, amount: Double) {
+        if (amount <= 0.0) return
+        ensureUser(username)
+        balances[username] = getBalance(username) - amount
+    }
+
+    /** Place (or stage) an active bet; call from your normal user flow. */
+    fun placeBet(username: String, gameId: Int, pick: String, stake: Double, odds: Double) {
+        if (username.isBlank() || stake <= 0.0) return
+        if (isBanned(username)) return
+        ensureUser(username)
+
+        activeBets += Bet(
+            id = betSeq++,
+            username = username,
+            gameId = gameId,
+            pick = pick.lowercase(), // "home" / "away"
+            stake = stake,
+            odds = odds
+        )
+
+        if (ESCROW_STAKE) debit(username, stake) // hold stake up front if desired
+    }
+
+    fun withdraw(username: String, amount: Double) {
+        if (amount <= 0.0) return
+        ensureUser(username)
+        val current = getBalance(username)
+        if (current >= amount) {
+            // simple subtract, no overdraft
+            val balancesField = javaClass.getDeclaredField("balances")
+            balancesField.isAccessible = true
+            @Suppress("UNCHECKED_CAST")
+            val balances = balancesField.get(this) as MutableMap<String, Double>
+            balances[username] = current - amount
+        }
+    }
+
+    fun getActiveBetsForGame(gameId: Int): List<Bet> =
+        activeBets.filter { it.gameId == gameId }
+
+    fun getActiveBetsForUser(username: String): List<Bet> =
+        activeBets.filter { it.username == username }
+
+    private fun removeActiveBet(id: Long) {
+        activeBets.removeAll { it.id == id }
+    }
+
+    // ---- Admin: add game + matching event ----
+    fun addGameAndEvent(
+        sport: String,
+        homeTeam: String,
+        awayTeam: String,
+        date: String,
+        homeOdds: Double,
+        awayOdds: Double
+    ) {
+        val nextId = ((_games.maxOfOrNull { it.id } ?: 0) + 1)
+        _games += Game(
+            id = nextId,
+            homeTeam = homeTeam,
+            awayTeam = awayTeam,
+            homeScore = null,
+            awayScore = null,
+            date = date,
+            status = "upcoming",
+            sport = sport
+        )
+        _events += BiddingEvent(
+            id = nextId,
+            title = sport,
+            team1 = homeTeam,
+            team2 = awayTeam,
+            odds1 = homeOdds,
+            odds2 = awayOdds,
+            category = "Sports"
+        )
+    }
+
+    // ---- Set result + settle bets (called by SetGameResultScreen) ----
+    fun updateGameResult(gameId: Int, homeScore: Int, awayScore: Int): List<BetPayout> {
+        val idx = _games.indexOfFirst { it.id == gameId }
+        if (idx < 0) return emptyList()
+
+        val g = _games[idx]
+        val finalGame = g.copy(
+            homeScore = homeScore,
+            awayScore = awayScore,
+            status = "completed"
+        )
+        _games[idx] = finalGame
+
+        // This will remove resolved bets and compute payouts
+        return resolveBetsForGame(finalGame)
+    }
+
+    private fun resolveBetsForGame(game: Game): List<BetPayout> {
+        val h = game.homeScore ?: 0
+        val a = game.awayScore ?: 0
+        val homeWon = h > a
+        val awayWon = a > h
+        val isTie = !homeWon && !awayWon
+
+        val toResolve = activeBets.filter { it.gameId == game.id }.toList()
+        val payouts = mutableListOf<BetPayout>()
+
+        toResolve.forEach { bet ->
+            val (result, payoutAmount) = when {
+                isTie -> {
+                    // Push: refund stake
+                    BetResult.PUSH to bet.stake
+                }
+                homeWon && bet.pick == "home" || awayWon && bet.pick == "away" -> {
+                    // Winning side: full return = stake * odds
+                    BetResult.WIN to (bet.stake * bet.odds)
+                }
+                else -> {
+                    // Losing side: stake was already removed / at risk
+                    BetResult.LOSS to 0.0
+                }
+            }
+
+            payouts += BetPayout(
+                username = bet.username,
+                amount = payoutAmount,
+                gameId = bet.gameId,
+                pick = bet.pick,
+                stake = bet.stake,
+                odds = bet.odds,
+                result = result
+            )
+
+            // bet is no longer active after result
+            removeActiveBet(bet.id)
+        }
+
+        return payouts
+    }
+
+
+    fun seedBanned(usernames: List<String>) {
+        bannedUsers.clear()
+        bannedUsers.addAll(usernames)
+    }
+
+    fun applyResultOverrides(overrides: List<AuthRepository.GameResultOverride>) {
+        overrides.forEach { o ->
+            val idx = _games.indexOfFirst { it.id == o.gameId }
+            if (idx >= 0) {
+                val g = _games[idx]
+                _games[idx] = g.copy(
+                    homeScore = o.homeScore,
+                    awayScore = o.awayScore,
+                    status = o.status
+                )
+            }
+        }
+    }
+
+    data class BetPayout(
+        val username: String,
+        val amount: Double,      // payout credited (0, stake, or stake*odds)
+        val gameId: Int,
+        val pick: String,        // "home" or "away"
+        val stake: Double,
+        val odds: Double,
+        val result: BetResult
     )
 
-    // ------------------------------
-    //  Bids + Balances per user
-    // ------------------------------
+    enum class BetResult { WIN, LOSS, PUSH }
 
-    private val userBids = mutableMapOf<String, MutableList<Bid>>()
 
-    private const val DEFAULT_BALANCE = 1000.0
-    private val userBalances = mutableMapOf<String, Double>()
+    // ===== Stats for Settings / Profile "Win/Loss History" =====
 
-    fun placeBid(username: String, bid: Bid) {
-        val list = userBids.getOrPut(username) { mutableListOf() }
-        list.add(bid)
+    data class UserBetStats(
+        val wins: Int,
+        val losses: Int,
+        val pushes: Int,
+        val totalBets: Int,
+        val winRate: Double   // 0.0–1.0; wins / (wins + losses), pushes ignored
+    )
+
+    /**
+     * Aggregate stats for a given user across all resolved bets.
+     * Use this in your Settings/Profile screen.
+     */
+    fun getUserBetStats(username: String): UserBetStats {
+        val history = betHistory.filter { it.username == username }
+
+        if (history.isEmpty()) {
+            return UserBetStats(
+                wins = 0,
+                losses = 0,
+                pushes = 0,
+                totalBets = 0,
+                winRate = 0.0
+            )
+        }
+
+        val wins = history.count { it.result == BetResult.WIN }
+        val losses = history.count { it.result == BetResult.LOSS }
+        val pushes = history.count { it.result == BetResult.PUSH }
+        val total = history.size
+
+        // win rate ignores pushes: wins / (wins + losses)
+        val denom = wins + losses
+        val winRate = if (denom > 0) wins.toDouble() / denom else 0.0
+
+        return UserBetStats(
+            wins = wins,
+            losses = losses,
+            pushes = pushes,
+            totalBets = total,
+            winRate = winRate
+        )
     }
-
-    fun getUserBalance(username: String): Double {
-        // If user has no stored balance yet, we treat it as default
-        return userBalances[username] ?: DEFAULT_BALANCE
-    }
-
-    fun setUserBalance(username: String, newBalance: Double) {
-        userBalances[username] = newBalance
-    }
-
 }

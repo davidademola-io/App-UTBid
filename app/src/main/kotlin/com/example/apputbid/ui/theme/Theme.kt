@@ -5,7 +5,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
+import com.example.apputbid.ui.AuthViewModel
+import com.example.apputbid.ui.Route
+import com.example.apputbid.ui.admin.AdminDashboard
+import com.example.apputbid.ui.admin.AdminLoginScreen
+import com.example.apputbid.ui.auth.LoginScreen
+import com.example.apputbid.ui.main.MainScreen
 
 // Colors
 private val Orange = Color(0xFFFF6B35)
@@ -51,3 +59,4 @@ fun UniBiddingTheme(
         content = content
     )
 }
+

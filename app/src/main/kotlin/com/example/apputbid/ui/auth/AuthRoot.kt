@@ -1,5 +1,7 @@
 package com.example.apputbid.ui.auth
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -10,23 +12,69 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.apputbid.ui.AuthViewModel
+import com.example.apputbid.ui.Route
+import com.example.apputbid.ui.admin.AdminDashboard
+import com.example.apputbid.ui.admin.AdminLoginScreen
 import com.example.apputbid.ui.main.MainScreen
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun UniBiddingApp(vm: AuthViewModel) {
+fun UniBiddingApp(
+    vm: AuthViewModel,
+    isDarkTheme: Boolean,
+    onToggleTheme: () -> Unit
+) {
     val state by vm.state.collectAsState()
 
-    when (state.currentUser) {
-        null -> LoginScreen(vm = vm)
-        else -> MainScreen(
-            username = state.currentUser!!.username,
-            onLogout = { vm.logout() }
-        )
+    when (state.route) {
+        is Route.Login -> {
+            LoginScreen(vm = vm)
+        }
+
+        is Route.AdminLogin -> {
+            AdminLoginScreen(
+                onBack = { vm.backToLogin() },
+                onAdminAuthed = {
+                    vm.adminLogin()  // ✅ no params now, we already validated
+                }
+            )
+        }
+
+
+        is Route.Main -> {
+            val user = state.currentUser
+            if (user != null) {
+                MainScreen(
+                    username = user.username,
+                    isDarkTheme = isDarkTheme,
+                    onToggleTheme = onToggleTheme,
+                    onLogout = { vm.logout() },
+                    authRepository = vm.authRepository   // 👈 REQUIRED
+                )
+            } else {
+                LoginScreen(vm = vm)
+            }
+        }
+
+        is Route.Admin -> {
+            AdminDashboard(
+                vm = vm,
+                isDarkTheme = isDarkTheme,
+                onToggleTheme = onToggleTheme,
+                onLogout = { vm.logout() }
+            )
+        }
     }
 }
 
+
+
+
+
 @Composable
-fun LoginScreen(vm: AuthViewModel) {
+fun LoginScreen(
+    vm: AuthViewModel
+) {
     val state by vm.state.collectAsState()
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -134,6 +182,19 @@ fun LoginScreen(vm: AuthViewModel) {
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
+            }
+
+            // —— Admin login button ——
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = { vm.goToAdminLogin() },   // ✅ navigates to AdminLogin route
+                enabled = !state.loading,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+            ) {
+                Text("Admin login")
             }
         }
     }
