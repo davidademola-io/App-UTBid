@@ -117,20 +117,22 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
     fun clearError() { _state.value = _state.value.copy(error = null) }
 
     // --- admin auth (passcode only, no DB row needed) ---
-    fun adminLogin(passcode: String) {
-        val ok = passcode == BuildConfig.ADMIN_PASSCODE
-        _state.value = if (ok) {
-            _state.value.copy(
-                error = null,
-                // create a virtual admin user to reuse your UI if needed
-                currentUser = User(id = -1L, username = "admin", saltB64 = "", hashB64 = ""),
-                isAdmin = true,
-                route = Route.Admin
-            )
-        } else {
-            _state.value.copy(error = "Invalid admin passcode")
-        }
+    fun adminLogin() {
+        // ✅ Credentials have already been validated in AdminLoginScreen.
+        // Just mark this session as admin and route to the Admin dashboard.
+        _state.value = _state.value.copy(
+            error = null,
+            currentUser = User(
+                id = -1L,
+                username = "admin",
+                saltB64 = "",
+                hashB64 = ""
+            ),
+            isAdmin = true,
+            route = Route.Admin
+        )
     }
+
 
 
     fun updateFinalScore(

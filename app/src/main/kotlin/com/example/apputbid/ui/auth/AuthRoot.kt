@@ -31,11 +31,12 @@ fun UniBiddingApp(
         is Route.AdminLogin -> {
             AdminLoginScreen(
                 onBack = { vm.backToLogin() },
-                onAdminAuthed = { passcode ->
-                    vm.adminLogin(passcode)
+                onAdminAuthed = {
+                    vm.adminLogin()  // ✅ no params now, we already validated
                 }
             )
         }
+
 
         is Route.Main -> {
             val user = state.currentUser
@@ -73,8 +74,6 @@ fun LoginScreen(
     val state by vm.state.collectAsState()
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var showAdmin by remember { mutableStateOf(false) }
-    var adminPass by remember { mutableStateOf("") }
 
     val errorMessage = state.error.orEmpty()
 
@@ -184,7 +183,7 @@ fun LoginScreen(
             // —— Admin login button ——
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedButton(
-                onClick = { vm.goToAdminLogin() },   // << was dialog before; now navigates
+                onClick = { vm.goToAdminLogin() },   // ✅ navigates to AdminLogin route
                 enabled = !state.loading,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -194,36 +193,5 @@ fun LoginScreen(
                 Text("Admin login")
             }
         }
-    }
-
-    // —— Admin passcode dialog ——
-    if (showAdmin) {
-        AlertDialog(
-            onDismissRequest = { showAdmin = false },
-            title = { Text("Admin Login") },
-            text = {
-                OutlinedTextField(
-                    value = adminPass,
-                    onValueChange = { adminPass = it },
-                    label = { Text("Admin passcode") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        // Requires vm.adminLogin(passcode). See VM snippet below.
-                        vm.adminLogin(adminPass)
-                        adminPass = ""
-                        showAdmin = false
-                    }
-                ) { Text("Enter") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAdmin = false }) { Text("Cancel") }
-            }
-        )
     }
 }
