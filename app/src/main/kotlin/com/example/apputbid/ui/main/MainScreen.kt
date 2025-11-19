@@ -27,9 +27,6 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import com.example.apputbid.data.BalanceStore
 import com.example.apputbid.data.BidsStore
-import com.example.apputbid.ui.main.BiddingDatabase
-import com.example.apputbid.ui.main.Game
-import com.example.apputbid.ui.main.BiddingEvent
 import com.example.apputbid.ui.settings.SettingsScreen
 import com.example.apputbid.ui.wallet.WalletScreen
 
@@ -40,12 +37,14 @@ import com.example.apputbid.ui.wallet.WalletScreen
 @Composable
 fun MainScreen(
     username: String,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    isDarkTheme: Boolean,
+    onToggleTheme: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // ✅ Per-user balance (unchanged logic – just make sure this matches your latest)
+    // ✅ Per-user balance
     val balance by BalanceStore
         .balanceFlow(context, username)
         .collectAsState(initial = BalanceStore.DEFAULT_BALANCE)
@@ -58,22 +57,17 @@ fun MainScreen(
         }
     }
 
-    // Drawer + theme
+    // Drawer + settings
     val drawerState = rememberDrawerState(DrawerValue.Closed)
-    var isDarkTheme by remember { mutableStateOf(false) }
-
-    // Stub player stats for now
     val playerStats = remember { PlayerStats(wins = 0, losses = 0) }
-
-    // 🔹 New: are we in Settings screen?
     var showSettings by remember { mutableStateOf(false) }
 
     ProfileDrawer(
         drawerState = drawerState,
         username = username,
         playerStats = playerStats,
-        isDarkTheme = isDarkTheme,
-        onToggleTheme = { isDarkTheme = !isDarkTheme },
+        isDarkTheme = isDarkTheme,          // ✅ use global theme value
+        onToggleTheme = onToggleTheme,      // ✅ call global toggle callback
         onLogout = onLogout,
         onNavigateToSettings = {
             scope.launch { drawerState.close() }
@@ -84,8 +78,8 @@ fun MainScreen(
             // 🔹 Full-screen SettingsScreen
             SettingsScreen(
                 username = username,
-                isDarkTheme = isDarkTheme,
-                onToggleTheme = { isDarkTheme = !isDarkTheme },
+                isDarkTheme = isDarkTheme,      // ✅ same global value
+                onToggleTheme = onToggleTheme,  // ✅ same global toggle
                 onBack = { showSettings = false },
                 onLogout = onLogout
             )
@@ -831,7 +825,10 @@ fun HistoryBidCard(
         ) {
             Text(bid.eventTitle, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
-            Text("Team: ${bid.team}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "Team: ${bid.team}",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Spacer(Modifier.height(4.dp))
             Text(
                 "Amount: $${"%.2f".format(bid.amount)}",
@@ -921,7 +918,9 @@ fun ActiveBidsDialog(
                                     text = bid.eventTitle,
                                     fontWeight = FontWeight.Bold
                                 )
-                                Text("${bid.team}  •  $${"%.2f".format(bid.amount)} @ ${bid.odds}x")
+                                Text(
+                                    "${bid.team}  •  $${"%.2f".format(bid.amount)} @ ${bid.odds}x"
+                                )
                                 Text(
                                     text = "Potential win: $${"%.2f".format(bid.amount * bid.odds)}",
                                     style = MaterialTheme.typography.bodySmall
@@ -933,7 +932,7 @@ fun ActiveBidsDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onDismiss) {
                 Text("Close")
             }
         }

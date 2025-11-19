@@ -16,33 +16,38 @@ import com.example.apputbid.ui.admin.AdminLoginScreen
 import com.example.apputbid.ui.main.MainScreen
 
 @Composable
-fun UniBiddingApp(vm: AuthViewModel) {
+fun UniBiddingApp(
+    vm: AuthViewModel,
+    isDarkTheme: Boolean,
+    onToggleTheme: () -> Unit
+) {
     val state by vm.state.collectAsState()
 
     when (state.route) {
         is Route.Login -> {
-            // normal user login screen
             LoginScreen(vm = vm)
         }
 
         is Route.AdminLogin -> {
             AdminLoginScreen(
                 onBack = { vm.backToLogin() },
-                onAdminAuthed = { passcode ->
-                    vm.adminLogin(passcode)
+                onAdminAuthed = {
+                    vm.adminLogin()  // ✅ no params now, we already validated
                 }
             )
         }
+
 
         is Route.Main -> {
             val user = state.currentUser
             if (user != null) {
                 MainScreen(
                     username = user.username,
+                    isDarkTheme = isDarkTheme,
+                    onToggleTheme = onToggleTheme,
                     onLogout = { vm.logout() }
                 )
             } else {
-                // fall back to login if something is weird
                 LoginScreen(vm = vm)
             }
         }
@@ -50,21 +55,25 @@ fun UniBiddingApp(vm: AuthViewModel) {
         is Route.Admin -> {
             AdminDashboard(
                 vm = vm,
+                isDarkTheme = isDarkTheme,
+                onToggleTheme = onToggleTheme,
                 onLogout = { vm.logout() }
             )
         }
-
     }
 }
 
 
+
+
+
 @Composable
-fun LoginScreen(vm: AuthViewModel) {
+fun LoginScreen(
+    vm: AuthViewModel
+) {
     val state by vm.state.collectAsState()
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var showAdmin by remember { mutableStateOf(false) }
-    var adminPass by remember { mutableStateOf("") }
 
     val errorMessage = state.error.orEmpty()
 
@@ -174,7 +183,7 @@ fun LoginScreen(vm: AuthViewModel) {
             // —— Admin login button ——
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedButton(
-                onClick = { vm.goToAdminLogin() },   // << was dialog before; now navigates
+                onClick = { vm.goToAdminLogin() },   // ✅ navigates to AdminLogin route
                 enabled = !state.loading,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -184,36 +193,5 @@ fun LoginScreen(vm: AuthViewModel) {
                 Text("Admin login")
             }
         }
-    }
-
-    // —— Admin passcode dialog ——
-    if (showAdmin) {
-        AlertDialog(
-            onDismissRequest = { showAdmin = false },
-            title = { Text("Admin Login") },
-            text = {
-                OutlinedTextField(
-                    value = adminPass,
-                    onValueChange = { adminPass = it },
-                    label = { Text("Admin passcode") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        // Requires vm.adminLogin(passcode). See VM snippet below.
-                        vm.adminLogin(adminPass)
-                        adminPass = ""
-                        showAdmin = false
-                    }
-                ) { Text("Enter") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAdmin = false }) { Text("Cancel") }
-            }
-        )
     }
 }

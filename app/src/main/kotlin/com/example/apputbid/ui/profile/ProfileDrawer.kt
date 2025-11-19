@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
 import com.example.apputbid.ui.theme.UniBiddingTheme
 import androidx.compose.material.icons.filled.History
@@ -60,7 +61,7 @@ fun ProfileDrawerContent(
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit,
     onLogout: () -> Unit,
-    onNavigateToSettings: () -> Unit = {}  // Add navigation callback
+    onNavigateToSettings: () -> Unit = {}
 ) {
     var showHistory by remember { mutableStateOf(false) }
 
@@ -80,7 +81,7 @@ fun ProfileDrawerContent(
                 imageVector = Icons.Default.AccountCircle,
                 contentDescription = null,
                 modifier = Modifier.size(56.dp),
-                tint = Color(0xFF4169E1)  // Royal blue color
+                tint = Color(0xFF4169E1)  // keep your royal blue avatar
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column {
@@ -99,7 +100,7 @@ fun ProfileDrawerContent(
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-        // Theme Toggle Button
+        // Theme Toggle Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
@@ -122,11 +123,18 @@ fun ProfileDrawerContent(
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary
                     )
-                    Text(
-                        text = "Dark Mode",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Column {
+                        Text(
+                            text = "Dark Mode",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = if (isDarkTheme) "On" else "Off",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
                 Switch(
                     checked = isDarkTheme,
@@ -140,10 +148,13 @@ fun ProfileDrawerContent(
             onClick = { showHistory = !showHistory },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
-                containerColor = if (showHistory) MaterialTheme.colorScheme.primaryContainer
-                else MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = if (isDarkTheme) Color.White else Color.Black  // Adaptive text color
-            )
+                containerColor = if (showHistory)
+                    MaterialTheme.colorScheme.primaryContainer
+                else
+                    MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ),
+            shape = RoundedCornerShape(12.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.History,
@@ -154,7 +165,7 @@ fun ProfileDrawerContent(
             Text("Win/Loss History")
         }
 
-        // Show History Details
+        // History Details
         if (showHistory) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -245,8 +256,10 @@ fun ProfileDrawerContent(
                         Text(
                             text = "$winRate%",
                             fontWeight = FontWeight.Bold,
-                            color = if (winRate >= 50) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.error
+                            color = if (winRate >= 50)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.error
                         )
                     }
                 }
@@ -259,8 +272,9 @@ fun ProfileDrawerContent(
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = if (isDarkTheme) Color.White else Color.Black
-            )
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+            ),
+            shape = RoundedCornerShape(12.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.Settings,
@@ -284,8 +298,10 @@ fun ProfileDrawerContent(
             onClick = onLogout,
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.errorContainer
-            )
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer
+            ),
+            shape = RoundedCornerShape(12.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.Logout,
@@ -293,13 +309,12 @@ fun ProfileDrawerContent(
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Log Out",
-                color = MaterialTheme.colorScheme.onErrorContainer
-            )
+            Text("Log Out")
         }
     }
 }
+
+
 @Preview(showBackground = true)
 @Composable
 fun ProfileDrawerPreview() {

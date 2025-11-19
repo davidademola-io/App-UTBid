@@ -1,12 +1,12 @@
 package com.example.apputbid.ui.admin
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,47 +20,167 @@ import com.example.apputbid.ui.AuthViewModel
 import com.example.apputbid.ui.main.BiddingDatabase
 import com.example.apputbid.ui.main.Game
 
+import com.example.apputbid.BuildConfig
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminLoginScreen(
     onBack: () -> Unit,
-    onAdminAuthed: (String) -> Unit, // <-- pass key out
+    onAdminAuthed: () -> Unit  // ✅ success callback, no params
 ) {
-    var key by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Admin Login") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } }
+                title = {
+                    Text(
+                        text = "Admin Login",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    )
+                },
+                navigationIcon = {
+                    TextButton(onClick = onBack) {
+                        Text(
+                            "Back",
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFF4169E1),
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White
+                )
             )
         }
-    ) { inner ->
-        Column(
+    ) { innerPadding ->
+        Surface(
             modifier = Modifier
-                .padding(inner)
                 .fillMaxSize()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .padding(innerPadding),
+            color = MaterialTheme.colorScheme.background
         ) {
-            OutlinedTextField(
-                value = key,
-                onValueChange = { key = it },
-                label = { Text("Admin passcode") },
-                visualTransformation = PasswordVisualTransformation(),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = { onAdminAuthed(key) }, // <-- send key to caller
-                modifier = Modifier.fillMaxWidth(),
-                enabled = key.isNotBlank()
-            ) { Text("Enter Admin") }
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "Admin Login",
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFF9800) // orange branding
+                    ),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                Text(
+                    text = "Management Dashboard",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        color = Color(0xFF4169E1)
+                    ),
+                    modifier = Modifier.padding(bottom = 48.dp)
+                )
+
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text("Admin Username") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF4169E1),
+                        focusedLabelColor = Color(0xFF4169E1)
+                    )
+                )
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Admin Password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF4169E1),
+                        focusedLabelColor = Color(0xFF4169E1)
+                    )
+                )
+
+                if (errorMessage.isNotEmpty()) {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = {
+                        val correctUser = BuildConfig.ADMIN_USERNAME
+                        val correctPass = BuildConfig.ADMIN_PASSWORD
+
+                        if (username == correctUser && password == correctPass) {
+                            errorMessage = ""
+                            onAdminAuthed()   // ✅ tell parent “login OK”
+                        } else {
+                            errorMessage = "Invalid admin credentials"
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF4169E1)
+                    ),
+                    enabled = username.isNotBlank() && password.isNotBlank()
+                ) {
+                    Text(
+                        "Login as Admin",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                TextButton(onClick = onBack) {
+                    Text(
+                        "Back to User Login",
+                        color = Color(0xFF4169E1),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
         }
     }
 }
+
+
+
 
 @Composable
 fun UsersSection(vm: AuthViewModel) {
@@ -165,19 +285,56 @@ fun UsersSection(vm: AuthViewModel) {
     }
 }
 
-
-
-
-
+@RequiresApi(Build.VERSION_CODES.O)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddGameSection() {
     var sport by remember { mutableStateOf("") }
     var homeTeam by remember { mutableStateOf("") }
     var awayTeam by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf("") }
+    var date by remember { mutableStateOf("") }       // selected date text
+    var time by remember { mutableStateOf("") }       // selected time text
     var homeOdds by remember { mutableStateOf("") }
     var awayOdds by remember { mutableStateOf("") }
     var successMessage by remember { mutableStateOf("") }
+
+    // 🔽 dropdown expanded states
+    var dateExpanded by remember { mutableStateOf(false) }
+    var timeExpanded by remember { mutableStateOf(false) }
+
+    // ----- DATES: next 14 days -----
+    val dateFormatter = remember {
+        DateTimeFormatter.ofPattern("EEE, MMM d")   // e.g. "Fri, Nov 22"
+    }
+    val today = remember { LocalDate.now() }
+    val dateOptions = remember {
+        (0..13).map { offset ->
+            today.plusDays(offset.toLong()).format(dateFormatter)
+        }
+    }
+
+    // ----- TIMES: 24 hours, 30-min increments -----
+    val timeFormatter = remember {
+        DateTimeFormatter.ofPattern("h:mm a")       // e.g. "12:00 AM", "1:30 PM"
+    }
+    val timeOptions = remember {
+        buildList {
+            var current = LocalTime.of(7,0) // 00:00
+            repeat(30 ) {
+                add(current.format(timeFormatter))
+                current = current.plusMinutes(30)
+            }
+        }
+    }
+
+    // ✅ Single datetime string we store in DB
+    val dateTimeText = remember(date, time) {
+        if (date.isNotBlank() && time.isNotBlank()) {
+            "$date $time"          // e.g. "Fri, Nov 22 4:30 PM"
+        } else {
+            ""
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -233,18 +390,88 @@ fun AddGameSection() {
             )
         }
 
+        // 🔽 Date dropdown (next 14 days, scrollable)
         item {
-            OutlinedTextField(
-                value = date,
-                onValueChange = { date = it },
-                label = { Text("Date/Time") },
-                placeholder = { Text("e.g., Tomorrow, 4:00 PM") },
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF4169E1),
-                    focusedLabelColor = Color(0xFF4169E1)
+            ExposedDropdownMenuBox(
+                expanded = dateExpanded,
+                onExpandedChange = { dateExpanded = !dateExpanded }
+            ) {
+                OutlinedTextField(
+                    value = date,
+                    onValueChange = { /* readOnly */ },
+                    readOnly = true,
+                    label = { Text("Date") },
+                    placeholder = { Text("Select a date") },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = dateExpanded)
+                    },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF4169E1),
+                        focusedLabelColor = Color(0xFF4169E1)
+                    )
                 )
-            )
+
+                ExposedDropdownMenu(
+                    expanded = dateExpanded,
+                    onDismissRequest = { dateExpanded = false },
+                    modifier = Modifier.heightIn(max = 300.dp) // makes it scrollable
+                ) {
+                    dateOptions.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option) },
+                            onClick = {
+                                date = option
+                                dateExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        // 🔽 Time dropdown (24h x 30min, scrollable)
+        item {
+            ExposedDropdownMenuBox(
+                expanded = timeExpanded,
+                onExpandedChange = { timeExpanded = !timeExpanded }
+            ) {
+                OutlinedTextField(
+                    value = time,
+                    onValueChange = { /* readOnly */ },
+                    readOnly = true,
+                    label = { Text("Time") },
+                    placeholder = { Text("Select a time") },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = timeExpanded)
+                    },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF4169E1),
+                        focusedLabelColor = Color(0xFF4169E1)
+                    )
+                )
+
+                ExposedDropdownMenu(
+                    expanded = timeExpanded,
+                    onDismissRequest = { timeExpanded = false },
+                    modifier = Modifier.heightIn(max = 300.dp) // scrollable list
+                ) {
+                    timeOptions.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option) },
+                            onClick = {
+                                time = option
+                                timeExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
         }
 
         item {
@@ -254,7 +481,9 @@ fun AddGameSection() {
             ) {
                 OutlinedTextField(
                     value = homeOdds,
-                    onValueChange = { homeOdds = it.filter { char -> char.isDigit() || char == '.' } },
+                    onValueChange = {
+                        homeOdds = it.filter { char -> char.isDigit() || char == '.' }
+                    },
                     label = { Text("Home Odds") },
                     placeholder = { Text("e.g., 1.8") },
                     modifier = Modifier.weight(1f),
@@ -265,7 +494,9 @@ fun AddGameSection() {
                 )
                 OutlinedTextField(
                     value = awayOdds,
-                    onValueChange = { awayOdds = it.filter { char -> char.isDigit() || char == '.' } },
+                    onValueChange = {
+                        awayOdds = it.filter { char -> char.isDigit() || char == '.' }
+                    },
                     label = { Text("Away Odds") },
                     placeholder = { Text("e.g., 2.1") },
                     modifier = Modifier.weight(1f),
@@ -281,7 +512,7 @@ fun AddGameSection() {
             item {
                 Text(
                     successMessage,
-                    color = Color(0xFF4CAF50),  // Green
+                    color = Color(0xFF4CAF50),
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -289,36 +520,42 @@ fun AddGameSection() {
 
         item {
             Button(
-                    onClick = {
-                        val homeOddsDouble = homeOdds.toDoubleOrNull()
-                        val awayOddsDouble = awayOdds.toDoubleOrNull()
+                onClick = {
+                    val homeOddsDouble = homeOdds.toDoubleOrNull()
+                    val awayOddsDouble = awayOdds.toDoubleOrNull()
 
-                        if (sport.isNotBlank() && homeTeam.isNotBlank() &&
-                            awayTeam.isNotBlank() && date.isNotBlank() &&
-                            homeOddsDouble != null && awayOddsDouble != null
-                        ) {
-                            BiddingDatabase.addGameAndEvent(
-                                sport = sport,
-                                homeTeam = homeTeam,
-                                awayTeam = awayTeam,
-                                date = date,
-                                homeOdds = homeOddsDouble,
-                                awayOdds = awayOddsDouble
-                            )
+                    if (sport.isNotBlank() && homeTeam.isNotBlank() &&
+                        awayTeam.isNotBlank() && dateTimeText.isNotBlank() &&
+                        homeOddsDouble != null && awayOddsDouble != null
+                    ) {
+                        BiddingDatabase.addGameAndEvent(
+                            sport = sport,
+                            homeTeam = homeTeam,
+                            awayTeam = awayTeam,
+                            date = dateTimeText,  // ✅ full "date + time" string
+                            homeOdds = homeOddsDouble,
+                            awayOdds = awayOddsDouble
+                        )
 
-                            successMessage = "Game added successfully!"
-                            sport = ""
-                            homeTeam = ""
-                            awayTeam = ""
-                            date = ""
-                            homeOdds = ""
-                            awayOdds = ""
-                        }
-                    },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                enabled = sport.isNotBlank() && homeTeam.isNotBlank() &&
-                        awayTeam.isNotBlank() && date.isNotBlank() &&
-                        homeOdds.isNotBlank() && awayOdds.isNotBlank(),
+                        successMessage = "Game added successfully!"
+                        sport = ""
+                        homeTeam = ""
+                        awayTeam = ""
+                        date = ""
+                        time = ""
+                        homeOdds = ""
+                        awayOdds = ""
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                enabled = sport.isNotBlank() &&
+                        homeTeam.isNotBlank() &&
+                        awayTeam.isNotBlank() &&
+                        dateTimeText.isNotBlank() &&
+                        homeOdds.isNotBlank() &&
+                        awayOdds.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF4169E1)
                 )
@@ -328,6 +565,11 @@ fun AddGameSection() {
         }
     }
 }
+
+
+
+
+
 
 @Composable
 fun SetResultsSection(vm: AuthViewModel) {
@@ -508,105 +750,83 @@ fun SetGameResultScreen(game: Game,
         }
     }
 }
- @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
-    fun AdminDashboard(
-        vm: AuthViewModel,
-        onLogout: () -> Unit
-    ) {
-        var selectedSection by remember { mutableStateOf(0) }
-        var showAccountSheet by remember { mutableStateOf(false) }
+@RequiresApi(Build.VERSION_CODES.O)
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AdminDashboard(
+    vm: AuthViewModel,
+    isDarkTheme: Boolean,
+    onToggleTheme: () -> Unit,
+    onLogout: () -> Unit
+) {
+    var selectedSection by remember { mutableStateOf(0) }
 
-     Scaffold(
-         topBar = {
-             Surface(
-                 modifier = Modifier.fillMaxWidth(),
-                 color = Color(0xFF4169E1),
-                 tonalElevation = 4.dp
-             ) {
-                 Row(
-                     modifier = Modifier
-                         .fillMaxWidth()
-                         .padding(horizontal = 16.dp, vertical = 12.dp),
-                     horizontalArrangement = Arrangement.SpaceBetween,
-                     verticalAlignment = Alignment.CenterVertically
-                 ) {
-                     Text(
-                         "Admin Dashboard",
-                         fontSize = 24.sp,
-                         fontWeight = FontWeight.Bold,
-                         color = Color.White
-                     )
-
-                     // 🔹 THIS is the admin Logout button
-                     TextButton(onClick = onLogout) {
-                         Text(
-                             text = "Logout",
-                             color = Color.White,
-                             fontWeight = FontWeight.Bold
-                         )
-                     }
-                 }
-             }
-         }
-         // ...
-     )
-     { paddingValues ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            ) {
-                ScrollableTabRow(
-                    selectedTabIndex = selectedSection,
-                    modifier = Modifier.fillMaxWidth(),
-                    containerColor = MaterialTheme.colorScheme.background,
-                    contentColor = Color(0xFF4169E1)
-                ) {
-                    Tab(
-                        selected = selectedSection == 0,
-                        onClick = { selectedSection = 0 },
-                        text = { Text("Users") }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        "Admin Dashboard",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
                     )
-                    Tab(
-                        selected = selectedSection == 1,
-                        onClick = { selectedSection = 1 },
-                        text = { Text("Add Game") }
-                    )
-                    Tab(
-                        selected = selectedSection == 2,
-                        onClick = { selectedSection = 2 },
-                        text = { Text("Set Results") }
-                    )
-                }
-
-                when (selectedSection) {
-                    0 -> UsersSection(vm = vm)
-                    1 -> AddGameSection()
-                    2 -> SetResultsSection(vm = vm)
-                }
-            }
-        }
-
-    if (showAccountSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showAccountSheet = false },
-            dragHandle = { BottomSheetDefaults.DragHandle() }
-        ) {
-            Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                Text("Account", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Spacer(Modifier.height(12.dp))
-                ListItem(
-                    headlineContent = { Text("Logout") },
-                    modifier = Modifier.clickable {
-                        showAccountSheet = false
-                        onLogout()
+                },
+                actions = {
+                    TextButton(onClick = onLogout) {
+                        Text(
+                            "Logout",
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFF4169E1),
+                    titleContentColor = Color.White,
+                    actionIconContentColor = Color.White
                 )
-                Spacer(Modifier.height(8.dp))
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            // Tabs for sections
+            ScrollableTabRow(
+                selectedTabIndex = selectedSection,
+                modifier = Modifier.fillMaxWidth(),
+                containerColor = MaterialTheme.colorScheme.background,
+                contentColor = Color(0xFF4169E1)
+            ) {
+                Tab(
+                    selected = selectedSection == 0,
+                    onClick = { selectedSection = 0 },
+                    text = { Text("Users") }
+                )
+                Tab(
+                    selected = selectedSection == 1,
+                    onClick = { selectedSection = 1 },
+                    text = { Text("Add Game") }
+                )
+                Tab(
+                    selected = selectedSection == 2,
+                    onClick = { selectedSection = 2 },
+                    text = { Text("Set Results") }
+                )
+            }
+
+            // Section content
+            when (selectedSection) {
+                0 -> UsersSection(vm = vm)
+                1 -> AddGameSection()
+                2 -> SetResultsSection(vm = vm)
             }
         }
     }
 }
+
 
 
