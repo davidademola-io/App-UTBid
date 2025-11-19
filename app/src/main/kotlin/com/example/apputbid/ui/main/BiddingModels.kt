@@ -70,6 +70,20 @@ object BiddingDatabase {
     private val activeBets = mutableListOf<Bet>()
     private var betSeq = 1L
 
+
+    data class BetHistory(
+        val betId: Long,
+        val username: String,
+        val gameId: Int,
+        val pick: String,
+        val stake: Double,
+        val odds: Double,
+        val result: BetResult,
+        val payout: Double    // 0, stake, or stake * odds
+    )
+
+    private val betHistory = mutableListOf<BetHistory>()
+
     // ---- Seeds ----
     private val _events = mutableListOf(
         BiddingEvent(1, "Men's Soccer", "Blue Ballers", "Kinfolk", 1.8, 2.1, "Sports"),
@@ -113,17 +127,16 @@ object BiddingDatabase {
     }
 
     fun getAllUsers(): List<String> =
-    (registeredUsers + balances.keys + activeBets.map { it.username })
-    .filter { it.isNotBlank() && it != "admin" }
-    .distinct()
-    .sorted()
+        (registeredUsers + balances.keys + activeBets.map { it.username })
+            .filter { it.isNotBlank() && it != "admin" }
+            .distinct()
+            .sorted()
 
     fun isBanned(username: String): Boolean = username in bannedUsers
 
     fun banUser(username: String) {
         bannedUsers += username
     }
-
 
     fun unbanUser(username: String) {
         bannedUsers -= username
@@ -137,16 +150,13 @@ object BiddingDatabase {
 
     fun getBalance(username: String): Double = balances[username] ?: 0.0
 
-
     private fun credit(username: String, amount: Double) = addFunds(username, amount)
-
 
     private fun debit(username: String, amount: Double) {
         if (amount <= 0.0) return
         ensureUser(username)
         balances[username] = getBalance(username) - amount
     }
-
 
     /** Place (or stage) an active bet; call from your normal user flow. */
     fun placeBet(username: String, gameId: Int, pick: String, stake: Double, odds: Double) {
@@ -180,9 +190,11 @@ object BiddingDatabase {
         }
     }
 
-
     fun getActiveBetsForGame(gameId: Int): List<Bet> =
         activeBets.filter { it.gameId == gameId }
+
+    fun getActiveBetsForUser(username: String): List<Bet> =
+        activeBets.filter { it.username == username }
 
     private fun removeActiveBet(id: Long) {
         activeBets.removeAll { it.id == id }
@@ -236,7 +248,6 @@ object BiddingDatabase {
         return resolveBetsForGame(finalGame)
     }
 
-
     private fun resolveBetsForGame(game: Game): List<BetPayout> {
         val h = game.homeScore ?: 0
         val a = game.awayScore ?: 0
@@ -248,30 +259,32 @@ object BiddingDatabase {
         val payouts = mutableListOf<BetPayout>()
 
         toResolve.forEach { bet ->
-            val payoutAmount = when {
+            val (result, payoutAmount) = when {
                 isTie -> {
                     // Push: refund stake
-                    bet.stake
+                    BetResult.PUSH to bet.stake
                 }
                 homeWon && bet.pick == "home" || awayWon && bet.pick == "away" -> {
-                    // We already subtracted the stake when the user placed the bet,
-                    // so credit FULL RETURN = stake * odds
-                    bet.stake * bet.odds
+                    // Winning side: full return = stake * odds
+                    BetResult.WIN to (bet.stake * bet.odds)
                 }
                 else -> {
-                    // Losing side: stake was already removed, no extra change
-                    0.0
+                    // Losing side: stake was already removed / at risk
+                    BetResult.LOSS to 0.0
                 }
             }
 
-            if (payoutAmount > 0.0) {
-                payouts += BetPayout(
-                    username = bet.username,
-                    amount = payoutAmount
-                )
-            }
+            payouts += BetPayout(
+                username = bet.username,
+                amount = payoutAmount,
+                gameId = bet.gameId,
+                pick = bet.pick,
+                stake = bet.stake,
+                odds = bet.odds,
+                result = result
+            )
 
-            // In all cases, bet is no longer active after result
+            // bet is no longer active after result
             removeActiveBet(bet.id)
         }
 
@@ -300,11 +313,59 @@ object BiddingDatabase {
 
     data class BetPayout(
         val username: String,
-        val amount: Double
+        val amount: Double,      // payout credited (0, stake, or stake*odds)
+        val gameId: Int,
+        val pick: String,        // "home" or "away"
+        val stake: Double,
+        val odds: Double,
+        val result: BetResult
     )
 
-    fun getActiveBetsForUser(username: String): List<Bet> =
-        activeBets.filter { it.username == username }
+    enum class BetResult { WIN, LOSS, PUSH }
 
 
+    // ===== Stats for Settings / Profile "Win/Loss History" =====
+
+    data class UserBetStats(
+        val wins: Int,
+        val losses: Int,
+        val pushes: Int,
+        val totalBets: Int,
+        val winRate: Double   // 0.0–1.0; wins / (wins + losses), pushes ignored
+    )
+
+    /**
+     * Aggregate stats for a given user across all resolved bets.
+     * Use this in your Settings/Profile screen.
+     */
+    fun getUserBetStats(username: String): UserBetStats {
+        val history = betHistory.filter { it.username == username }
+
+        if (history.isEmpty()) {
+            return UserBetStats(
+                wins = 0,
+                losses = 0,
+                pushes = 0,
+                totalBets = 0,
+                winRate = 0.0
+            )
+        }
+
+        val wins = history.count { it.result == BetResult.WIN }
+        val losses = history.count { it.result == BetResult.LOSS }
+        val pushes = history.count { it.result == BetResult.PUSH }
+        val total = history.size
+
+        // win rate ignores pushes: wins / (wins + losses)
+        val denom = wins + losses
+        val winRate = if (denom > 0) wins.toDouble() / denom else 0.0
+
+        return UserBetStats(
+            wins = wins,
+            losses = losses,
+            pushes = pushes,
+            totalBets = total,
+            winRate = winRate
+        )
+    }
 }

@@ -6,18 +6,21 @@ import kotlinx.coroutines.withContext
 
 class AuthRepository(private val db: UserDbHelper) {
 
+    // ============================================================
+    // USERS
+    // ============================================================
+
     suspend fun getAllUsernames(): List<String> =
         withContext(Dispatchers.IO) {
             db.getAllUsernames()
         }
-
 
     suspend fun register(username: String, password: CharArray): Result<Long> =
         withContext(Dispatchers.IO) {
             if (username.isBlank() || password.isEmpty())
                 return@withContext Result.failure(IllegalArgumentException("Username and password required"))
 
-            if(!username.endsWith("@mavs.uta.edu")){
+            if (!username.endsWith("@mavs.uta.edu")) {
                 return@withContext Result.failure(IllegalArgumentException("Must be a UTA email"))
             }
 
@@ -68,6 +71,10 @@ class AuthRepository(private val db: UserDbHelper) {
             db.getAllBannedUsernames()
         }
 
+    // ============================================================
+    // GAME RESULTS
+    // ============================================================
+
     data class GameResultOverride(
         val gameId: Int,
         val homeScore: Int,
@@ -85,5 +92,45 @@ class AuthRepository(private val db: UserDbHelper) {
             db.getAllGameResults()
         }
 
+    // ============================================================
+    // NEW: BET HISTORY (persistent)
+    // ============================================================
+
+    suspend fun insertBetHistory(
+        username: String,
+        gameId: Int,
+        pick: String,
+        stake: Double,
+        odds: Double,
+        result: String,
+        payout: Double
+    ) = withContext(Dispatchers.IO) {
+        db.insertBetHistory(
+            username = username,
+            gameId = gameId,
+            pick = pick,
+            stake = stake,
+            odds = odds,
+            result = result,
+            payout = payout
+        )
+    }
+
+    suspend fun getTotalWon(username: String): Double =
+        withContext(Dispatchers.IO) {
+            db.getTotalWon(username)
+        }
+
+    suspend fun getUserBetStats(username: String): UserBetStats =
+        withContext(Dispatchers.IO) {
+            db.getUserBetStats(username)
+        }
+
+    data class UserBetStats(
+        val wins: Int,
+        val losses: Int,
+        val totalGames: Int,
+        val winRate: Double
+    )
 
 }

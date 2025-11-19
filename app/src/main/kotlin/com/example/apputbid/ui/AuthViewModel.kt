@@ -24,6 +24,10 @@ data class AuthState(
 class AuthViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = AuthRepository(UserDbHelper.get(app))
 
+    // Expose the repository to the UI layer (UniBiddingApp, MainScreen, etc.)
+    val authRepository: AuthRepository
+        get() = repo
+
     private val _state = MutableStateFlow(AuthState())
     val state: StateFlow<AuthState> = _state
 
@@ -143,7 +147,7 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
     ) {
         viewModelScope.launch {
             try {
-                // 1) Persist result in SQLite (you already wired this)
+                // 1) Persist result in SQLite
                 repo.saveGameResult(
                     gameId = gameId,
                     home = homeScore,
@@ -163,13 +167,33 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
                 if (payouts.isNotEmpty()) {
                     val ctx = getApplication<Application>().applicationContext
 
-                    // In case a user has multiple bets on the same game, sum them
+                    // Update balances as before
                     payouts
                         .groupBy { it.username }
                         .forEach { (username, userPayouts) ->
                             val total = userPayouts.sumOf { it.amount }
                             BalanceStore.adjustBalance(ctx, username, total)
                         }
+
+                    // 4) 🔹 NEW: persist each bet result into bet_history table
+                    payouts.forEach { p ->
+                        // Map enum to string "WIN" / "LOSS" / "PUSH"
+                        val resultString = when (p.result) {
+                            BiddingDatabase.BetResult.WIN -> "WIN"
+                            BiddingDatabase.BetResult.LOSS -> "LOSS"
+                            BiddingDatabase.BetResult.PUSH -> "PUSH"
+                        }
+
+                        repo.insertBetHistory(
+                            username = p.username,
+                            gameId = p.gameId,
+                            pick = p.pick,
+                            stake = p.stake,
+                            odds = p.odds,
+                            result = resultString,
+                            payout = p.amount
+                        )
+                    }
                 }
 
                 onDone(true, null)
@@ -179,6 +203,7 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
 
 
 
