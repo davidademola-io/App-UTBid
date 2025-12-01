@@ -77,6 +77,10 @@ fun SettingsScreen(
     var showPasswordDialog by remember { mutableStateOf(false) }
     var notificationsEnabled by remember { mutableStateOf(true) }
 
+    // NEW: simple info dialogs for Version + Terms
+    var showVersionDialog by remember { mutableStateOf(false) }
+    var showTermsDialog by remember { mutableStateOf(false) }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -84,7 +88,7 @@ fun SettingsScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // 🔹 New banner at the top
+            // Top app bar
             SettingsTopBar(onBack = onBack)
 
             // Settings Content
@@ -118,29 +122,12 @@ fun SettingsScreen(
                                 .padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            SettingsItem(
-                                icon = Icons.Default.Person,
-                                title = "Username",
-                                subtitle = username,
-                                onClick = { /* Could open edit dialog */ }
-                            )
-
-                            HorizontalDivider()
-
+                            // 🔹 Only keep Password for now
                             SettingsItem(
                                 icon = Icons.Default.Lock,
                                 title = "Password",
                                 subtitle = "Change your password",
                                 onClick = { showPasswordDialog = true }
-                            )
-
-                            HorizontalDivider()
-
-                            SettingsItem(
-                                icon = Icons.Default.Email,
-                                title = "Email",
-                                subtitle = "Not connected",
-                                onClick = { /* Add email */ }
                             )
                         }
                     }
@@ -206,7 +193,7 @@ fun SettingsScreen(
                     }
                 }
 
-                // Notifications Section
+                // Notifications Section (can stay visual-only)
                 item {
                     Text(
                         text = "Notifications",
@@ -291,29 +278,22 @@ fun SettingsScreen(
                                 .padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
+                            // Version → opens info dialog
                             SettingsItem(
                                 icon = Icons.Default.Info,
                                 title = "Version",
-                                subtitle = "1.0.0",
-                                onClick = { }
+                                subtitle = "UTBid 1.0.0",
+                                onClick = { showVersionDialog = true }
                             )
 
                             HorizontalDivider()
 
+                            // Terms of Service → opens info dialog
                             SettingsItem(
                                 icon = Icons.Default.Description,
                                 title = "Terms of Service",
                                 subtitle = "Read our terms of service",
-                                onClick = { /* Show terms */ }
-                            )
-
-                            HorizontalDivider()
-
-                            SettingsItem(
-                                icon = Icons.Default.BugReport,
-                                title = "Report a Bug",
-                                subtitle = "Help us improve",
-                                onClick = { /* Open bug report */ }
+                                onClick = { showTermsDialog = true }
                             )
                         }
                     }
@@ -361,9 +341,62 @@ fun SettingsScreen(
     if (showPasswordDialog) {
         PasswordChangeDialog(
             onDismiss = { showPasswordDialog = false },
-            onConfirm = { oldPassword, newPassword ->
-                // Handle password change
+            onConfirm = { _, _ ->
+                // TODO: wire real password change when backend / logic is ready
                 showPasswordDialog = false
+            }
+        )
+    }
+
+    // Version dialog
+    if (showVersionDialog) {
+        AlertDialog(
+            onDismissRequest = { showVersionDialog = false },
+            title = {
+                Text(
+                    text = "App Version",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "UTBid Version 1.0.0\n\n" +
+                            "This is a demo betting application built for educational purposes. " +
+                            "All balances and wagers are virtual and have no real monetary value."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showVersionDialog = false }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
+
+    // Terms of Service dialog
+    if (showTermsDialog) {
+        AlertDialog(
+            onDismissRequest = { showTermsDialog = false },
+            title = {
+                Text(
+                    text = "Terms of Service",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "• UTBid is a mock betting app for practice and education only.\n" +
+                                "• No real money is used, earned, or lost in this app.\n" +
+                                "• Do not treat balances or results as financial advice.\n" +
+                                "• By using this app, you agree that all activity is simulated."
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showTermsDialog = false }) {
+                    Text("Close")
+                }
             }
         )
     }
